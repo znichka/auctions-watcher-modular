@@ -1,0 +1,19 @@
+---
+version: "2.1"
+services:
+  auction-watcher:
+    image: local/auctions-bot
+    container_name: auctions-bot
+    network_mode: host
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        CHROME_HOST: localhost
+        CHROME_PORT: 4444
+        SE_NODE_MAX_SESSIONS: 2
+        TZ: Europe/Warsaw
+

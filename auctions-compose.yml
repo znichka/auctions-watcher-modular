@@ -1,0 +1,56 @@
+---
+version: "2.1"
+services:
+  auction-watcher:
+    image: local/auctions-bot
+    container_name: auctions-bot
+    network_mode: host
+    restart: unless-stopped
+    mem_limit: 512m
+    depends_on:
+      - db
+      - chrome
+    environment:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        CHROME_HOST: localhost
+        CHROME_PORT: 4444
+        SE_NODE_MAX_SESSIONS: 2
+        TZ: Europe/Warsaw
+  db:
+    image: postgres
+    container_name: postgres
+    network_mode: bridge
+    restart: unless-stopped
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+  chrome:
+    image: selenium/standalone-chrome
+    container_name: chrome
+    network_mode: bridge
+    ports:
+      - 4444:4444
+      - 7900:7900
+    environment:
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+      - SE_NODE_MAX_SESSIONS=2
+      - VNC_NO_PASSWORD=1
+    volumes:
+      - /dev/shm:/dev/shm
+    shm_size: 2g
+    restart: unless-stopped
+volumes:
+  postgres-data:
+    external: true
+networks:
+  bridge:
+    external: true
+  host:
+    external: true
