@@ -98,9 +98,12 @@ fabric.properties
 *.json
 *temp*
 */config jsons/
-
-
 *.sh
 *.py
 *-test.yml
 *-dev.sql
+env-*.yaml
+env-*.yml
+
+watchers-manager/target/
+page-parser/target/

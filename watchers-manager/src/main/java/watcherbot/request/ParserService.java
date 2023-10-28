@@ -1,17 +1,17 @@
 package watcherbot.request;
 
 import lombok.extern.java.Log;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
-import org.springframework.http.*;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import watcherbot.description.ItemDescription;
 import watcherbot.description.PageDescription;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 @Component
@@ -21,24 +21,27 @@ public class ParserService {
     @Value("${docker.parser.url}")
     String PARSER_ENDPOINT;
 
+    @Autowired
+    RestTemplate restTemplate;
+
     public List<ItemDescription> getItems(PageDescription pageDescription) {
         return getItems(pageDescription.getUrl());
     }
 
     public List<ItemDescription> getItems(String url) {
-        RestTemplate restTemplate = new RestTemplate();
+        try {
+            var map = new HashMap<String, String>();
+            map.put("url", url);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            ResponseEntity<ItemDescription[]> response = restTemplate.getForEntity(PARSER_ENDPOINT, ItemDescription[].class, map);
+            ItemDescription[] itemDescriptions = response.getBody();
 
-        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
-        formData.add("url", url);
-        HttpEntity<MultiValueMap<String, String>> requestEntity = new HttpEntity<>(formData, headers);
-
-        ResponseEntity<ItemDescription[]> response = restTemplate.exchange(PARSER_ENDPOINT, HttpMethod.GET, requestEntity, ItemDescription[].class);
-        ItemDescription[] itemDescriptions = response.getBody();
-
-        if (itemDescriptions == null) itemDescriptions = new ItemDescription[0];
-        return Arrays.asList(itemDescriptions);
+            if (itemDescriptions == null) itemDescriptions = new ItemDescription[0];
+            return Arrays.asList(itemDescriptions);
+        } catch (Exception e) {
+            log.severe("Getting items failed for url " + url);
+            log.severe(e.getMessage());
+            return List.of();
+        }
     }
 }

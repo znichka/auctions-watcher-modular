@@ -1,5 +1,6 @@
 package parser.controller;
 
+import jakarta.websocket.server.PathParam;
 import lombok.extern.java.Log;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +24,7 @@ public class ParserController {
 
     @GetMapping("/parse")
     @ResponseBody
-     List<ItemDescription> getItems(@RequestParam("url") String url) {
+     List<ItemDescription> getItems(@PathParam("url") String url) {
         System.out.println(url);
         List<ItemDescription> result = new ArrayList<>();
         try {

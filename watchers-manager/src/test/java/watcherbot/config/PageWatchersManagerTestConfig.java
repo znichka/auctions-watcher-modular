@@ -3,7 +3,9 @@ package watcherbot.config;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.*;
+import org.springframework.web.client.RestTemplate;
 import watcherbot.request.ParserService;
 import watcherbot.request.SenderQueue;
 import watcherbot.description.ManagerDescription;
@@ -20,6 +22,11 @@ import java.util.concurrent.ScheduledExecutorService;
 public class PageWatchersManagerTestConfig {
     @Autowired
     ObjectProvider<PageWatchersManager> pageWatchersManagerProvider;
+
+    @Bean
+    public RestTemplate restTemplate(RestTemplateBuilder builder) {
+        return builder.build();
+    }
 
     @Bean
     TelegramBotSender getMockTelegramBotSender() {

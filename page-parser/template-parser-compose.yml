@@ -1,0 +1,37 @@
+---
+version: "2.1"
+services:
+  parser:
+    image: local/{{parser_name}}
+    container_name: {{parser_name}}
+    network_mode: host
+    restart: unless-stopped
+    mem_limit: 512m
+    depends_on:
+      - chrome
+    environment:
+        CHROME_HOST: {{chrome_host}}
+        CHROME_PORT: {{chrome_port}}
+        SE_NODE_MAX_SESSIONS: {{chrome_max_sessions}}
+        SERVER_PORT: {{server_port}}
+        TZ: Europe/Warsaw
+  chrome:
+    image: {{chrome_image}}:latest
+    container_name: {{chrome_name}}
+    network_mode: bridge
+    ports:
+      - {{chrome_port}}:4444
+      - {{chrome_vnc_port}}:7900
+    environment:
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+      - SE_NODE_MAX_SESSIONS={{chrome_max_sessions}}
+      - VNC_NO_PASSWORD=1
+    volumes:
+      - /dev/shm:/dev/shm
+    shm_size: 2g
+    restart: unless-stopped
+networks:
+  host:
+    external: true
+  bridge:
+    external: true

@@ -9,7 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>auctions-watcher-manager</artifactId>
+    <artifactId>watchers-manager</artifactId>
 <!--    <packaging>jar</packaging>-->
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
@@ -36,7 +36,11 @@
             <artifactId>postgresql</artifactId>
             <version>42.5.4</version>
         </dependency>
-
+<!--        <dependency>-->
+<!--            <groupId>com.fasterxml.jackson.core</groupId>-->
+<!--            <artifactId>jackson-databind</artifactId>-->
+<!--            <version>2.13.3</version>-->
+<!--        </dependency>-->
     </dependencies>
 
 </project>
