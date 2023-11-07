@@ -13,7 +13,7 @@ services:
         CHROME_HOST: ${chrome_host}
         CHROME_PORT: ${chrome_port}
         SE_NODE_MAX_SESSIONS: ${chrome_max_sessions}
-        SERVER_PORT: ${server_port}
+        SERVER_PORT: ${parser_port}
         TZ: Europe/Warsaw
   chrome:
     image: ${chrome_image}:latest
