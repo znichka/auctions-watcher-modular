@@ -29,10 +29,11 @@ services:
       POSTGRES_USER: ${db_user}
       POSTGRES_PASSWORD: ${db_password}
     volumes:
-      - ${db_volume}:/var/lib/postgresql/data
+      - auction-data:/var/lib/postgresql/data
 volumes:
-  ${db_volume}:
+  auction-data:
     external: true
+    name: ${db_volume}
 networks:
   bridge:
     external: true
