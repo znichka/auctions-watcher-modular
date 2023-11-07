@@ -104,6 +104,8 @@ fabric.properties
 *-dev.sql
 env-*.yaml
 env-*.yml
+*.env
 
 watchers-manager/target/
 page-parser/target/
+
