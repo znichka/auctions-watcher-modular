@@ -19,7 +19,7 @@ public class SenderQueue {
     @Autowired
     TelegramBotSender sender;
 
-    public synchronized void send(TelegramBotCredentials credentials, ItemDescription item) {
+    public void send(TelegramBotCredentials credentials, ItemDescription item) {
         executorService.submit(() -> {
             try {
                 sender.sendItemDescription(credentials, item);

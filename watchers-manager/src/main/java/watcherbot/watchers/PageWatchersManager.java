@@ -45,14 +45,11 @@ public class PageWatchersManager  {
     final Map<Integer, PageDescription> registeredPages;
     final Map<Integer, ScheduledFuture<?>> registeredScheduledTasks;
 
-    LinkedBlockingQueue<ItemDescription> items;
-
     public PageWatchersManager(ManagerDescription description) {
         this.description = description;
 
         registeredPages = new HashMap<>();
         registeredScheduledTasks = new HashMap<>();
-        items = new LinkedBlockingQueue<>();
     }
 
     public List<ItemDescription> filterUniqueItems(List<ItemDescription> items){
