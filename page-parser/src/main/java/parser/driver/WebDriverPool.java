@@ -5,7 +5,6 @@ import lombok.extern.java.Log;
 
 import org.openqa.selenium.Cookie;
 import org.openqa.selenium.Keys;
-import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.logging.LogEntries;
 import org.openqa.selenium.logging.LogType;
@@ -34,7 +33,7 @@ public class WebDriverPool {
     }
 
     @SneakyThrows
-    public String get(String url, boolean scroll, ExpectedCondition<WebElement> expectedCondition) {
+    public String get(String url, boolean scroll, ExpectedCondition<?> expectedCondition) {
         Callable<String> callable = () -> {
             log.info("Obtaining WebDriver for "+url);
             AutoCloseableWebDriver driver = webDriverProvider.getObject();

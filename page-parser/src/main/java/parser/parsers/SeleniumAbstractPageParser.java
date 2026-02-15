@@ -4,7 +4,6 @@ import parser.driver.WebDriverPool;
 import lombok.extern.java.Log;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedCondition;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +17,7 @@ public abstract class SeleniumAbstractPageParser extends AbstractPageParser  {
     @Autowired
     WebDriverPool webDriverPool;
 
-    protected abstract ExpectedCondition<WebElement> expectedCondition();
+    protected abstract ExpectedCondition<?> expectedCondition();
 
     protected boolean scroll = false;
 

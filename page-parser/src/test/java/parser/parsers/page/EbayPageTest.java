@@ -48,7 +48,7 @@ public class EbayPageTest {
 
     @Test
     public void getNoItemsEbayCom2() {
-        String url = "https://www.ebay.com/sch/i.html?_from=R40&_trksid=p2380057.m570.l1313&_nkw=blablabla+woohoo&_sacat=0";
+        String url = "https://www.ebay.com/sch/i.html?_from=R40&_trksid=p2380057.m570.l1313&_nkw=blaasdkf+woohoo&_sacat=0";
         assertEquals(0, ebayPageParser.getAllItems(url).size());
 
 //        url = "https://www.ebay.com/sch/i.html?_from=R40&_trksid=p2380057.m570.l1313&_nkw=wiltrud+elbert+christbaumschmuck&_sacat=0";

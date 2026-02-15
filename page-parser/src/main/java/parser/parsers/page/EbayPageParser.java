@@ -3,37 +3,84 @@ package parser.parsers.page;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.openqa.selenium.By;
+import org.openqa.selenium.support.ui.ExpectedCondition;
+import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.springframework.stereotype.Component;
 import parser.data.ItemDescription;
-import parser.parsers.AbstractPageParser;
+import parser.parsers.SeleniumAbstractPageParser;
 
 @Component
-public class EbayPageParser extends AbstractPageParser {
+public class EbayPageParser extends SeleniumAbstractPageParser {
+    @Override
+    protected ExpectedCondition<?> expectedCondition() {
+        return ExpectedConditions.or(
+                ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".srp-results")),
+                ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".brw-product-card"))
+        );
+    }
+
     @Override
     public Elements getElementCardsList(Document doc) {
-//        Element count = doc.getElementsByClass("srp-controls__count-heading").first().selectFirst("span");
-        Element count = doc.getElementsByClass("srp-controls__count-heading").first();
-        count = (count.selectFirst("span") != null) ? count.selectFirst("span") : count;
+        // Search results page (/sch/)
+        Elements searchCards = doc.select("li.s-card");
+        if (!searchCards.isEmpty()) {
+            Element count = doc.getElementsByClass("srp-controls__count-heading").first();
+            if (count != null) {
+                Element span = count.selectFirst("span");
+                String text = span != null ? span.text() : count.text();
+                if (text.equals("0")) return new Elements();
+            }
+            return searchCards;
+        }
 
-        if (count.text().equals("0")) return new Elements() ;
-        return doc.getElementsByClass("s-item__wrapper");
+        // Category page (/b/)
+        return doc.getElementsByClass("brw-product-card");
     }
 
     @Override
     public ItemDescription getItemFromCard(Element card) {
-        Element item = card.getElementsByClass("s-item__image").first();
-        item = item.getElementsByTag("a").first();
+        if (card.hasClass("brw-product-card")) {
+            return getItemFromCategoryCard(card);
+        }
+        return getItemFromSearchCard(card);
+    }
 
-        String itemUrl = item.attr("href");
-        itemUrl = itemUrl.substring(0 ,itemUrl.indexOf('?'));
+    private ItemDescription getItemFromSearchCard(Element card) {
+        String id = card.attr("data-listingid");
 
-        String id = itemUrl.substring(itemUrl.length()-12);
+        Element link = card.selectFirst("a.s-card__link");
+        String itemUrl = null;
+        if (link != null) {
+            itemUrl = link.attr("href");
+            int queryIdx = itemUrl.indexOf('?');
+            if (queryIdx > 0) itemUrl = itemUrl.substring(0, queryIdx);
+        }
 
-        Element imgElement = card.getElementsByClass("s-item__image-wrapper").first();
-        imgElement = imgElement.getElementsByTag("img").first();
+        Element imgElement = card.selectFirst("img.s-card__image");
+        String photoUrl = imgElement != null ? imgElement.attr("src") : null;
+        String caption = imgElement != null ? imgElement.attr("alt") : null;
 
-        String photoUrl = imgElement.attr("src");
-        String caption = imgElement.attr("alt");
+        return new ItemDescription(id, itemUrl, photoUrl, caption);
+    }
+
+    private ItemDescription getItemFromCategoryCard(Element card) {
+        Element link = card.selectFirst("a.brw-product-card__image-link");
+        String itemUrl = link != null ? link.attr("href") : null;
+
+        String id = null;
+        if (itemUrl != null) {
+            int iidIdx = itemUrl.indexOf("iid=");
+            if (iidIdx >= 0) {
+                id = itemUrl.substring(iidIdx + 4);
+                int ampIdx = id.indexOf('&');
+                if (ampIdx > 0) id = id.substring(0, ampIdx);
+            }
+        }
+
+        Element imgElement = card.selectFirst("img.brw-product-card__image");
+        String photoUrl = imgElement != null ? imgElement.attr("src") : null;
+        String caption = imgElement != null ? imgElement.attr("alt") : null;
 
         return new ItemDescription(id, itemUrl, photoUrl, caption);
     }
