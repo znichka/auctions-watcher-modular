@@ -38,7 +38,7 @@ public class MeshokPageTest {
 //    }
     @Test
     public void getAllItems() {
-        String url = "https://meshok.net/listing?a_o=15&city_id=32&good=16158&sort=beg_date&way=desc&reposted=N";
+        String url = "https://meshok.net/listing?a_o=15&city_id=32&good=14536&sort=beg_date&way=desc&reposted=N";
         assertTrue(meshokPageParser.getAllItems(url).size() > 0);
 
     }
