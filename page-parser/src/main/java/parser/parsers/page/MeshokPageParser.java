@@ -40,12 +40,12 @@ public class MeshokPageParser extends SeleniumAbstractPageParser {
 ////        }
 ////        return null;
 
-        Element titleElement = card.selectFirst("a.itemTitle_e29bb");
+        Element titleElement = card.selectFirst("a[class^=itemTitle]");
         String id = titleElement != null ? titleElement.attr("data-itemcard") : null;
         String itemUrl = titleElement != null ? "http://meshok.net" + titleElement.attr("href") : null;
         String caption = titleElement != null ? titleElement.text() : null;
 
-        Element imgElement = card.selectFirst("a.image_e29bb img");
+        Element imgElement = card.selectFirst("a[class^=image] img");
         String photoUrl = null;
         if (imgElement != null) {
             photoUrl = "https://meshok.net" + imgElement.attr("src");

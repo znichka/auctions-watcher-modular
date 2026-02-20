@@ -19,23 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class MeshokPageTest {
     @Autowired
     MeshokPageParser meshokPageParser;
-//    @Autowired
-//    WebDriver driver;
-//
-//    @Test
-//    public void test()
-//    {
-//        driver.get("https://meshok.net/en/listing?a_o=15&city_id=32&good=14299&sort=beg_date&way=desc&reposted=N");
-//        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
-//        try
-//        {
-//            wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("div[class^=itemCardList]")));
-//        } catch (Exception e) {
-//            LogEntries logs = driver.manage().logs().get(LogType.BROWSER);
-//            logs.getAll().forEach(l -> out.println(l.getMessage()));
-//            throw e;
-//        }
-//    }
+
     @Test
     public void getAllItems() {
         String url = "https://meshok.net/listing?a_o=15&city_id=32&good=14536&sort=beg_date&way=desc&reposted=N";
@@ -52,6 +36,5 @@ public class MeshokPageTest {
     public void getNoItemsSearch() {
         String url = "https://meshok.net/listing?a=1&a_o=2&a_o=15&good=109&search=blablabla&pp=48&sort=beg_date&way=desc&reposted=N";
         assertEquals(0, meshokPageParser.getAllItems(url).size());
-
     }
 }
