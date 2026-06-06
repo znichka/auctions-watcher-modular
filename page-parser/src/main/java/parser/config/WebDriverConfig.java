@@ -23,14 +23,13 @@ public class WebDriverConfig {
     @Scope("prototype")
     @Profile("local")
     public static synchronized AutoCloseableWebDriver getLocalWebDriver() {
-        WebDriverManager.chromedriver().setup();
         ChromeOptions options = new ChromeOptions();
 
         options.addArguments("--no-sandbox");
         options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.setExperimentalOption("excludeSwitches", java.util.List.of("enable-automation"));
-        options.addArguments("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6.1 Safari/605.1.15");
+        options.addArguments("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36");
         options.addArguments("--remote-allow-origins=*");
 
         return new AutoCloseableWebDriver(new ChromeDriver(options));
