@@ -1,0 +1,131 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+A notifier for new items appearing on auction marketplaces. Watched pages are polled on a
+schedule; new items are pushed to Telegram bots. The system is configured at runtime over a REST
+API. Supported sources: meshok.net, antiques.ay.by, etsy.com, ebay.com/ebay.de, olx.pl, plus
+parsers for avito and kufar.
+
+## Architecture
+
+Maven multi-module project (Java 21, Spring Boot 3.1.4). Two independently deployed Spring Boot
+apps that talk over HTTP:
+
+### `page-parser` — stateless scraping service
+- Single endpoint: `GET /parse?url={url}` returns a JSON array of `ItemDescription`. Also `GET /health`.
+- `PageParserFactory` (`parser.parsers`) routes a URL to a parser by matching each host segment
+  against every parser's `getDomainName()` (e.g. host `antiques.ay.by` → parser returning `"ay"`).
+  Unsupported hosts throw `OperationNotSupportedException`.
+- Each marketplace parser lives in `parser.parsers.page` and extends one of two bases:
+  - `AbstractPageParser` — fetches the page directly with **Jsoup** (`getDocument`). Used by
+    Avito, Ay, Etsy, Kufar.
+  - `SeleniumAbstractPageParser` — renders the page through a headless Chrome `WebDriverPool`,
+    then hands the HTML to Jsoup. Used by Meshok, Ebay, Olx. These also declare an
+    `expectedCondition()` (a Selenium `ExpectedCondition` the pool waits on) and may set
+    `scroll = true` to trigger lazy loading. Falls back to plain Jsoup if no WebDriver is available.
+- A parser implements three methods: `getElementCardsList(doc)` (select item cards),
+  `getItemFromCard(card)` (extract one `ItemDescription`), `getDomainName()`. Per-item parse
+  errors are caught and skipped — a broken card never fails the whole page.
+- `WebDriverPool` bounds Selenium concurrency with a fixed thread pool sized by
+  `selenium.sessions.max`. `WebDriverConfig` provides the driver via two mutually exclusive Spring
+  profiles: **`local`** = a local `ChromeDriver`; **everything else (`!local`)** = a
+  `RemoteWebDriver` pointing at a Selenium Grid container (`docker.chromedriver.url`). The remote
+  default is what runs in production.
+- **Site layouts and bot-detection change often** — most recent commits are parser/selector/stealth
+  fixes. Selectors frequently use prefix matches like `div[class^=itemCard]` to survive hashed
+  class names. When a parser breaks, the fix is usually in its CSS selectors and/or the
+  `expectedCondition`.
+
+### `watchers-manager` — stateful orchestrator
+- REST CRUD under `ConfigurationController`: `/bots` (managers), `/bots/{id}`,
+  `/bots/{id}/pages`, `DELETE /bots/{id}/pages/{pageId}`, `/health`.
+- Domain model (JPA entities in `watcherbot.description`): a **`ManagerDescription`** = one
+  Telegram bot (embedded `TelegramBotCredentials` token + chatId, plus a set of pages). A
+  **`PageDescription`** = one watched URL with a polling `period` (minutes).
+- `PageWatcherService` is the core. On startup (`@PostConstruct`) it loads all managers from the
+  DB and creates a prototype-scoped `PageWatchersManager` per manager. `PageWatchersManager`
+  schedules each page on a shared `ScheduledExecutorService` (`scheduleAtFixedRate`, period in
+  minutes). Each run: call `page-parser` over HTTP (`ParserService`) → filter to unique items
+  (`ItemsService`) → enqueue for sending (`SenderQueue` → `TelegramBotSender`).
+- **Deduplication** is in `ItemsService` using raw SQL via `NamedParameterJdbcTemplate` against an
+  `items` table (`item_id, image_hash, manager_id, url`). `insertIfUnique` returns true only when a
+  row was actually inserted, so "new item" == "successful insert". When
+  `check-for-image-duplicates=true`, an item is also considered a duplicate if another item for the
+  same manager has the same image hash. Image hash = MD5 of the downloaded photo, computed lazily
+  in `ItemDescription.getPhotoHash()`.
+- Telegram delivery: `TelegramBotSender` calls the Telegram HTTP API directly; the primary path
+  (`sendItemDescription`) uploads the photo bytes as multipart with an HTML caption linking to the
+  item. `SenderQueue` serializes all sends through a single-thread executor.
+
+### Cross-module note
+`ItemDescription` is **duplicated** in both modules (`parser.data` and `watcherbot.description`)
+by design — the parser produces it as JSON, the manager deserializes it. Keep the JSON-relevant
+fields (`id`, `itemUrl`, `photoUrl`, `caption`) in sync across both copies when changing them.
+
+### Persistence
+- Production: PostgreSQL. `spring.jpa.hibernate.ddl-auto=none` everywhere — **the DB schema is
+  managed externally, not by Hibernate**. The `managers`/`pages` tables back JPA entities; the
+  `items` table is accessed only via raw SQL. Adding/altering tables means changing the DB by hand.
+- Dev/test: in-memory H2 in PostgreSQL-compatibility mode (`application-dev.properties` for the
+  `dev` profile; `src/test/resources/application.properties` for tests).
+
+## Build, test, run
+
+All commands from the repo root unless noted.
+
+```bash
+# Build both modules (also copies runtime deps to target/dependency, needed by the Dockerfiles)
+mvn clean package
+
+# Build skipping tests (what the deploy scripts do)
+mvn clean package -DskipTests
+
+# Run all tests
+mvn test
+
+# Test a single module
+mvn -pl page-parser test
+mvn -pl watchers-manager test
+
+# Run a single test class / method
+mvn -pl page-parser -Dtest=MeshokPageTest test
+mvn -pl watchers-manager -Dtest=ItemsServiceTest#someMethod test
+```
+
+### Running locally
+Both apps read config from env-var placeholders in `application.properties`, so set them (or use a
+profile) before running:
+- **page-parser**: use the `local` Spring profile to drive a local Chrome instead of the remote
+  grid: `-Dspring.profiles.active=local`. Otherwise set `CHROME_HOST`/`CHROME_PORT`/
+  `SE_NODE_MAX_SESSIONS` to reach a Selenium container.
+- **watchers-manager**: use the `dev` profile for in-memory H2 (no Postgres needed):
+  `-Dspring.profiles.active=dev`. It still needs `PARSER_HOST`/`PARSER_PORT` to reach a running
+  page-parser.
+
+## Deployment
+
+Docker-based, driven by per-module scripts. `page-parser/page-parser-up.sh` and
+`watchers-manager/watchers-manager-up.sh` each: `mvn clean package -DskipTests` → `docker build`
+(Dockerfiles copy `target/classes` + `target/dependency` onto the classpath) →
+`docker-compose ... up`. They target a remote Docker host via `DOCKER_HOST=ssh://nas`.
+
+- Compose files are `template-*-compose.yml` (prod) and `template-*-compose-test.yml`.
+- Runtime values come from `*-params.env` files at the repo root (e.g. `nas-prod-params.env`):
+  container names, ports, DB credentials, and Selenium settings. **These env files contain real
+  secrets (DB password) — do not echo, log, or commit changes that expose them.**
+- page-parser runs alongside a `selenium/standalone-chrome` container; the parser reaches Chrome at
+  `chrome_host:chrome_port`. `chrome_max_sessions` must match `selenium.sessions.max`.
+
+## Adding a new marketplace parser
+
+1. Create a class in `parser.parsers.page` extending `AbstractPageParser` (Jsoup-only) or
+   `SeleniumAbstractPageParser` (needs JS rendering). Annotate `@Component` — the factory
+   auto-discovers all `AbstractPageParser` beans.
+2. Implement `getDomainName()` to return a host segment that appears in target URLs, plus
+   `getElementCardsList` and `getItemFromCard`. For Selenium parsers also implement
+   `expectedCondition()`.
+3. Add a corresponding test in `page-parser/src/test/.../page/` following the existing
+   `*PageTest` pattern.
