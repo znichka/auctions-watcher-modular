@@ -1,5 +1,6 @@
 package parser.parsers.page;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,8 @@ public class EbayPageTest {
     }
 
     @Test
+    @Disabled("eBay.de blocks this search for Selenium-driven Chrome (bot 'Error Page') "
+            + "regardless of Chrome version or egress IP - fails on local Mac and NAS alike.")
     public void getAllItemsEbayDe_query() {
         String url = "https://www.ebay.de/sch/i.html?_from=R40&_nkw=alter+christbaum&_sacat=0&_sop=10";
         assertTrue(ebayPageParser.getAllItems(url).size() > 0);

@@ -45,15 +45,7 @@ public class WebDriverConfig {
         options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.setExperimentalOption("excludeSwitches", java.util.List.of("enable-automation"));
-        options.addArguments("--accept=application/json, text/plain, */*");
-        options.addArguments("--accept-encoding=gzip, deflate, br");
-        options.addArguments("--accept-language=en-GB,en-US;q=0.9,en;q=0.8");
-        options.addArguments("--sec-ch-ua=\"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\", \"Not-A.Brand\";v=\"8\"");
-        options.addArguments("--sec-ch-ua-mobile=?0");
-        options.addArguments("--sec-ch-ua-platform=Linux");
-        options.addArguments("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         options.addArguments("--remote-allow-origins=*");
-//        options.addArguments("--accept-lang=ru-RU");
 
 
         WebDriver driver = null;

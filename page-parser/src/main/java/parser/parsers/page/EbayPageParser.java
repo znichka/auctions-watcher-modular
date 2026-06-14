@@ -16,7 +16,7 @@ public class EbayPageParser extends SeleniumAbstractPageParser {
     protected ExpectedCondition<?> expectedCondition() {
         return ExpectedConditions.or(
                 ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".srp-results")),
-                ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".brw-product-card"))
+                ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".brwrvr__item-card"))
         );
     }
 
@@ -35,12 +35,12 @@ public class EbayPageParser extends SeleniumAbstractPageParser {
         }
 
         // Category page (/b/)
-        return doc.getElementsByClass("brw-product-card");
+        return doc.getElementsByClass("brwrvr__item-card");
     }
 
     @Override
     public ItemDescription getItemFromCard(Element card) {
-        if (card.hasClass("brw-product-card")) {
+        if (card.hasClass("brwrvr__item-card")) {
             return getItemFromCategoryCard(card);
         }
         return getItemFromSearchCard(card);
@@ -65,22 +65,32 @@ public class EbayPageParser extends SeleniumAbstractPageParser {
     }
 
     private ItemDescription getItemFromCategoryCard(Element card) {
-        Element link = card.selectFirst("a.brw-product-card__image-link");
-        String itemUrl = link != null ? link.attr("href") : null;
+        Element link = card.selectFirst("a.brwrvr__item-card__image-link");
+        if (link == null) return null; // skip "Shop on eBay" placeholder cards
 
+        String itemUrl = link.attr("href");
+        int queryIdx = itemUrl.indexOf('?');
+        if (queryIdx > 0) itemUrl = itemUrl.substring(0, queryIdx);
+
+        // Item id is the path segment after /itm/
         String id = null;
-        if (itemUrl != null) {
-            int iidIdx = itemUrl.indexOf("iid=");
-            if (iidIdx >= 0) {
-                id = itemUrl.substring(iidIdx + 4);
-                int ampIdx = id.indexOf('&');
-                if (ampIdx > 0) id = id.substring(0, ampIdx);
-            }
+        int itmIdx = itemUrl.indexOf("/itm/");
+        if (itmIdx >= 0) {
+            id = itemUrl.substring(itmIdx + 5);
+            int slashIdx = id.indexOf('/');
+            if (slashIdx > 0) id = id.substring(0, slashIdx);
         }
 
-        Element imgElement = card.selectFirst("img.brw-product-card__image");
-        String photoUrl = imgElement != null ? imgElement.attr("src") : null;
-        String caption = imgElement != null ? imgElement.attr("alt") : null;
+        Element imgElement = card.selectFirst("img.brwrvr__item-card__image");
+        String photoUrl = null;
+        if (imgElement != null) {
+            // images are lazy-loaded: real url is in data-src, src is a placeholder gif
+            photoUrl = imgElement.hasAttr("data-src") ? imgElement.attr("data-src") : imgElement.attr("src");
+        }
+
+        Element titleElement = card.selectFirst("h3.bsig__title__text");
+        String caption = titleElement != null ? titleElement.text()
+                : (imgElement != null ? imgElement.attr("alt") : null);
 
         return new ItemDescription(id, itemUrl, photoUrl, caption);
     }
