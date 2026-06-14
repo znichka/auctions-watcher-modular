@@ -4,31 +4,39 @@ import parser.data.ItemDescription;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.ExpectedCondition;
+import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.springframework.stereotype.Component;
-import parser.parsers.AbstractPageParser;
+import parser.parsers.SeleniumAbstractPageParser;
 
 @Component
-public class AvitoPageParser extends AbstractPageParser {
+public class AvitoPageParser extends SeleniumAbstractPageParser {
+
+    @Override
+    protected ExpectedCondition<WebElement> expectedCondition() {
+        return ExpectedConditions.visibilityOfElementLocated(By.cssSelector("div[data-marker=item]"));
+    }
 
     @Override
     public Elements getElementCardsList(Document doc) {
-        return doc.getElementsByClass("iva-item-root-Nj_hb");
+        return doc.select("div[data-marker=item]");
     }
 
     @Override
     public ItemDescription getItemFromCard(Element card) {
         String id = card.attr("data-item-id");
 
-        Element linkElement = card.getElementsByClass("link-link-MbQDP").first();
-        String caption = linkElement.attr("title");
-        String itemUrl = "www.avito.ru" + linkElement.attr("href");
+        Element linkElement = card.selectFirst("a[data-marker=item-title]");
+        String caption = linkElement.text();
+        String itemUrl = "https://www.avito.ru" + linkElement.attr("href");
         if (itemUrl.contains("?slocation")) {
             itemUrl = itemUrl.substring(0, itemUrl.indexOf("?slocation"));
         }
 
-        Element imageElement = card.getElementsByClass("photo-slider-list-xFf2c").first().selectFirst("li");
-        String imageUrl = imageElement.attr("data-marker");
-        imageUrl = imageUrl.substring(19);
+        Element imageElement = card.selectFirst("[data-marker=item-photo] img");
+        String imageUrl = imageElement != null ? imageElement.attr("src") : null;
 
         return new ItemDescription(id, itemUrl, imageUrl, caption);
     }
