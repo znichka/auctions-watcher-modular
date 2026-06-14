@@ -32,6 +32,10 @@ public class OlxPageParser extends SeleniumAbstractPageParser {
 
             String itemUrl = itemElement.attr("href");
             itemUrl = "https://www.olx.pl" + itemUrl;
+            int queryIndex = itemUrl.indexOf('?');
+            if (queryIndex != -1) {
+                itemUrl = itemUrl.substring(0, queryIndex);
+            }
             String id = itemUrl.substring(itemUrl.length() - 12, itemUrl.length() - 5);
 
             return new ItemDescription(id, itemUrl, photoUrl, caption);
