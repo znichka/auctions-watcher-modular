@@ -1,0 +1,16 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: telegram-ops
+    receivers:
+      # bottoken/chatid substituted from grafana-alerting-params.env by grafana-up.sh
+      # at build time (see the sed step there). Not done via Grafana's own $__env{}
+      # provisioning macro: it coerces a numeric-looking chat id into a JSON number
+      # before schema validation, which fails ("cannot unmarshal number into ...
+      # chatid of type string") regardless of YAML-level quoting.
+      - uid: telegram-ops-receiver
+        type: telegram
+        settings:
+          bottoken: "__TELEGRAM_BOT_TOKEN__"
+          chatid: "__TELEGRAM_CHAT_ID__"

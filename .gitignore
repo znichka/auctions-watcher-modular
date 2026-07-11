@@ -107,4 +107,7 @@ env-*.yml
 watchers-manager/target/
 page-parser/target/
 
+# Rendered from contact-points.yaml.template with real secrets baked in — never commit.
+grafana/provisioning/alerting/contact-points.yaml
+
 .DS_Store

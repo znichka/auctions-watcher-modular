@@ -1,0 +1,136 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: container-health
+    folder: Auctions Watcher Alerts
+    interval: 1m
+    rules:
+      - uid: scrape-target-down
+        title: Scrape target down
+        condition: C
+        for: 1m
+        noDataState: OK
+        execErrState: Alerting
+        labels: {}
+        annotations:
+          summary: "Prometheus scrape target down: job={{ $labels.job }} instance={{ $labels.instance }}"
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: up == 0
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: math
+              expression: "$A * 0 + 1"
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      - uid: container-stopped
+        title: Container stopped reporting
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: Alerting
+        labels: {}
+        annotations:
+          summary: "Container hasn't reported to cAdvisor in 90s+: {{ $labels.name }}"
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: time() - container_last_seen{name=~"auctions-.*"} > 90
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: math
+              expression: "$A * 0 + 1"
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      - uid: container-restarted
+        title: Container restarted
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: Alerting
+        labels: {}
+        annotations:
+          summary: "Container restarted in the last 15 minutes: {{ $labels.name }}"
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: changes(container_start_time_seconds{name=~"auctions-.*"}[15m]) > 0
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: math
+              expression: "$A * 0 + 1"
+          - refId: C
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
