@@ -96,9 +96,7 @@ fabric.properties
 # End of https://www.gitignore.io/api/intellij
 
 *.json
-*temp*
 */config jsons/
-*.sh
 *.py
 *-test.yml
 *-dev.sql

@@ -107,23 +107,33 @@ profile) before running:
 
 ## Deployment
 
-Docker-based, driven by per-module scripts. `page-parser/page-parser-up.sh` and
-`watchers-manager/watchers-manager-up.sh` each: `mvn clean package -DskipTests` → `docker build`
-(Dockerfiles copy `target/classes` + `target/dependency` onto the classpath) →
-`docker-compose ... up`. They target a remote Docker host via `DOCKER_HOST=ssh://nas`.
+Docker-based, driven by per-module scripts (`page-parser/page-parser-up.sh`,
+`watchers-manager/watchers-manager-up.sh`, and one `-up.sh` each for the monitoring stack below).
+The two app scripts additionally: `mvn clean package -DskipTests` → `docker build` (Dockerfiles
+copy `target/classes` + `target/dependency` onto the classpath) → `docker-compose ... up`.
 
+- **Every `-up.sh`/`-down.sh` script takes two optional positional args:** `$1` = `DOCKER_HOST`
+  (default `ssh://nas`), `$2` = the env file passed to `docker-compose --env-file` (default varies
+  per script, e.g. `../nas-prod-params.env`). Run with no args to deploy to the usual target;
+  pass args to point at a different host/env, e.g. `./page-parser-up.sh ssh://other-host
+  ../oracle-prod-params.env`.
 - **The two apps and the Chrome container are deployed by three separate `docker-compose` runs:**
   - `watchers-manager-up.sh` deploys the manager via `template-manager-compose.yml`.
-  - `page-parser-up.sh` deploys **only the parser**, via `template-parser-compose-test.yml` (in
-    that file the `chrome` service is commented out). So a parser redeploy never touches Chrome.
-  - The `selenium/standalone-chrome` container is defined in `template-parser-compose.yml` (the
-    file's `parser` service is unused by the scripts) and is brought up / recreated **on its own**:
-    `DOCKER_HOST=ssh://nas docker-compose -f template-parser-compose.yml --env-file
-    ../nas-prod-params.env up -d chrome`. A separate debug Chrome (`chrome-test-compose.yml`, ports
-    4445/7901) can run alongside it without conflict.
-- Runtime values come from `*-params.env` files at the repo root (e.g. `nas-prod-params.env`):
-  container names, ports, DB credentials, and Selenium settings. **These env files contain real
-  secrets (DB password) — do not echo, log, or commit changes that expose them.**
+  - `page-parser-up.sh` deploys **only the parser**, via `template-parser-compose-without-chrome.yml`
+    (in that file the `chrome` service is commented out). So a parser redeploy never touches Chrome.
+  - The `selenium/standalone-chrome` container is defined in `template-parser-compose-with-chrome.yml`
+    (the file's `parser` service is unused by the scripts) and is brought up / recreated **on its
+    own**: `DOCKER_HOST=ssh://nas docker-compose -f template-parser-compose-with-chrome.yml
+    --env-file ../nas-prod-params.env up -d chrome`. A separate debug Chrome
+    (`chrome-test-compose.yml`, ports 4445/7901) mirrors the prod chrome service's resource limits
+    (`mem_limit: 3g`, `/tmp`+`/dev/shm` tmpfs at `2g` each, `SE_NODE_MAX_SESSIONS` from
+    `chrome_max_sessions`) and can run alongside it without conflict. It also needs
+    `--env-file ../nas-prod-params.env` to resolve `chrome_max_sessions`.
+- Runtime values come from `*-params.env` files at the repo root (e.g. `nas-prod-params.env`,
+  `prometheus-params.env`, `cadvisor-params.env`, `grafana-params.env`): container names, ports, DB
+  credentials, and Selenium settings. **These env files contain real secrets (DB password) — do not
+  echo, log, or commit changes that expose them.** They're `.gitignore`d (`*.env`), so this is safe
+  by default even for new ones.
 - The parser reaches Chrome at `chrome_host:chrome_port`; `chrome_max_sessions` must match
   `selenium.sessions.max` (the parser's `selenium.sessions.max` is bound to the container's
   `SE_NODE_MAX_SESSIONS`).

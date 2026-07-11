@@ -1,21 +1,34 @@
 # Debug/testing Selenium Chrome — separate from the prod `auctions-chrome`.
 # Listens on 4445 (grid) / 7901 (noVNC) so it never conflicts with prod (4444/7900).
+# Resource limits and session count mirror the prod chrome service in
+# template-parser-compose-with-chrome.yml so behavior under load is comparable.
 #
-# Bring up:  DOCKER_HOST=ssh://nas docker-compose -f chrome-test-compose.yml up -d
+# Bring up:  DOCKER_HOST=ssh://nas docker-compose -f chrome-test-compose.yml --env-file ../nas-prod-params.env up -d
 # Stop:      DOCKER_HOST=ssh://nas docker stop auctions-chrome-test
 # Start:     DOCKER_HOST=ssh://nas docker start auctions-chrome-test
-# Remove:    DOCKER_HOST=ssh://nas docker-compose -f chrome-test-compose.yml down
+# Remove:    DOCKER_HOST=ssh://nas docker-compose -f chrome-test-compose.yml --env-file ../nas-prod-params.env down
 services:
   chrome-test:
     image: selenium/standalone-chrome:latest
     container_name: auctions-chrome-test
     network_mode: bridge
-    shm_size: 2g
+    init: true
+    mem_limit: 3g
     ports:
       - 4445:4444
       - 7901:7900
     environment:
       - SE_NODE_OVERRIDE_MAX_SESSIONS=true
-      - SE_NODE_MAX_SESSIONS=2
+      - SE_NODE_MAX_SESSIONS=${chrome_max_sessions}
+      - SE_NODE_SESSION_TIMEOUT=120
       - VNC_NO_PASSWORD=1
+    tmpfs:
+      - /tmp:size=2g
+      - /dev/shm:size=2g
     restart: "no"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -m 5 http://localhost:4444/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

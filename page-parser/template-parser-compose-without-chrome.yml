@@ -1,0 +1,20 @@
+---
+version: "2.1"
+services:
+  parser:
+    image: local/${parser_name}
+    container_name: ${parser_name}
+    network_mode: host
+    restart: unless-stopped
+    mem_limit: 512m
+    # Chrome is deployed separately via template-parser-compose-with-chrome.yml,
+    # so a parser redeploy here never touches it.
+    environment:
+        CHROME_HOST: ${chrome_host}
+        CHROME_PORT: ${chrome_port}
+        SE_NODE_MAX_SESSIONS: ${chrome_max_sessions}
+        SERVER_PORT: ${parser_port}
+        TZ: Europe/Warsaw
+networks:
+  host:
+    external: true
