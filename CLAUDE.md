@@ -158,7 +158,15 @@ copy `target/classes` + `target/dependency` onto the classpath) → `docker-comp
   `api_user`/`api_password` (wired to `API_USER`/`API_PASSWORD` in `template-manager-compose.yml`,
   see Security above). **These env files contain real secrets (DB password, Telegram bot token,
   API credentials) — do not echo, log, or commit changes that expose them.** They're `.gitignore`d
-  (`*.env`), so this is safe by default even for new ones.
+  (`*.env`), so this is safe by default even for new ones. Each has a committed `.example`
+  template with placeholder values, so a new deployment target can be bootstrapped by copying one
+  and filling in real values — keep these in sync when adding or renaming a key in the real env
+  files. `nas-prod-params.env`, `oracle-prod-params.env`, `oracle-test-params.env`, and
+  `oracle-dev-params.env` are all different hosts/environments filling the *same*
+  manager+parser+chrome+db schema (they're interchangeable as the `$2` arg to the app up/down
+  scripts), so they share one template, `app-deployment-params.env.example`, rather than one each.
+  `prometheus-params.env`, `cadvisor-params.env`, `grafana-params.env`, and
+  `grafana-alerting-params.env` have their own schemas and each keep their own `.example` file.
 - The parser reaches Chrome at `chrome_host:chrome_port`; `chrome_max_sessions` must match
   `selenium.sessions.max` (the parser's `selenium.sessions.max` is bound to the container's
   `SE_NODE_MAX_SESSIONS`).
