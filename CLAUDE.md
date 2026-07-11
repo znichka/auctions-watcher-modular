@@ -112,12 +112,29 @@ Docker-based, driven by per-module scripts. `page-parser/page-parser-up.sh` and
 (Dockerfiles copy `target/classes` + `target/dependency` onto the classpath) →
 `docker-compose ... up`. They target a remote Docker host via `DOCKER_HOST=ssh://nas`.
 
-- Compose files are `template-*-compose.yml` (prod) and `template-*-compose-test.yml`.
+- **The two apps and the Chrome container are deployed by three separate `docker-compose` runs:**
+  - `watchers-manager-up.sh` deploys the manager via `template-manager-compose.yml`.
+  - `page-parser-up.sh` deploys **only the parser**, via `template-parser-compose-test.yml` (in
+    that file the `chrome` service is commented out). So a parser redeploy never touches Chrome.
+  - The `selenium/standalone-chrome` container is defined in `template-parser-compose.yml` (the
+    file's `parser` service is unused by the scripts) and is brought up / recreated **on its own**:
+    `DOCKER_HOST=ssh://nas docker-compose -f template-parser-compose.yml --env-file
+    ../nas-prod-params.env up -d chrome`. A separate debug Chrome (`chrome-test-compose.yml`, ports
+    4445/7901) can run alongside it without conflict.
 - Runtime values come from `*-params.env` files at the repo root (e.g. `nas-prod-params.env`):
   container names, ports, DB credentials, and Selenium settings. **These env files contain real
   secrets (DB password) — do not echo, log, or commit changes that expose them.**
-- page-parser runs alongside a `selenium/standalone-chrome` container; the parser reaches Chrome at
-  `chrome_host:chrome_port`. `chrome_max_sessions` must match `selenium.sessions.max`.
+- The parser reaches Chrome at `chrome_host:chrome_port`; `chrome_max_sessions` must match
+  `selenium.sessions.max` (the parser's `selenium.sessions.max` is bound to the container's
+  `SE_NODE_MAX_SESSIONS`).
+- **Chrome container failure mode (recurring):** `/tmp` and `/dev/shm` are RAM-backed tmpfs. If
+  leaked Chrome profiles fill `/tmp`, new sessions fail with `session not created: DevToolsActivePort
+  file doesn't exist` (HTTP 500) — the container stays "up"/healthy but every Selenium site (meshok,
+  ebay, olx) returns zero items and the app silently stops delivering. Mitigations already in place:
+  Chrome runs `--headless=new` and uses `/dev/shm` (no `--disable-dev-shm-usage`), plus
+  `SE_NODE_SESSION_TIMEOUT` and `init: true` to reap stuck sessions/zombies. First diagnostic:
+  `docker exec auctions-chrome df -h /tmp`. The compose healthcheck is a liveness probe (does the
+  grid HTTP respond) — it does **not** trigger a restart on its own.
 
 ## Adding a new marketplace parser
 
