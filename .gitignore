@@ -109,3 +109,4 @@ env-*.yml
 watchers-manager/target/
 page-parser/target/
 
+.DS_Store
