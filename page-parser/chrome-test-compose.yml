@@ -1,0 +1,21 @@
+# Debug/testing Selenium Chrome — separate from the prod `auctions-chrome`.
+# Listens on 4445 (grid) / 7901 (noVNC) so it never conflicts with prod (4444/7900).
+#
+# Bring up:  DOCKER_HOST=ssh://nas docker-compose -f chrome-test-compose.yml up -d
+# Stop:      DOCKER_HOST=ssh://nas docker stop auctions-chrome-test
+# Start:     DOCKER_HOST=ssh://nas docker start auctions-chrome-test
+# Remove:    DOCKER_HOST=ssh://nas docker-compose -f chrome-test-compose.yml down
+services:
+  chrome-test:
+    image: selenium/standalone-chrome:latest
+    container_name: auctions-chrome-test
+    network_mode: bridge
+    shm_size: 2g
+    ports:
+      - 4445:4444
+      - 7901:7900
+    environment:
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+      - SE_NODE_MAX_SESSIONS=2
+      - VNC_NO_PASSWORD=1
+    restart: "no"

@@ -24,8 +24,9 @@ public class WebDriverConfig {
     public static synchronized AutoCloseableWebDriver getLocalWebDriver() {
         ChromeOptions options = new ChromeOptions();
 
+        options.addArguments("--headless=new");
+        options.addArguments("--disable-gpu");
         options.addArguments("--no-sandbox");
-        options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.setExperimentalOption("excludeSwitches", java.util.List.of("enable-automation"));
         options.addArguments("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36");
@@ -41,8 +42,9 @@ public class WebDriverConfig {
         log.info(dockerChomeDriverUrl);
         ChromeOptions options = new ChromeOptions();
 
+        options.addArguments("--headless=new");
+        options.addArguments("--disable-gpu");
         options.addArguments("--no-sandbox");
-        options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.setExperimentalOption("excludeSwitches", java.util.List.of("enable-automation"));
         options.addArguments("--remote-allow-origins=*");

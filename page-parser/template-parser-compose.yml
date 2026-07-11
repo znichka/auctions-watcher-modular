@@ -1,5 +1,5 @@
 ---
-version: "2.1"
+version: "2.4"
 services:
   parser:
     image: local/${parser_name}
@@ -8,7 +8,8 @@ services:
     restart: unless-stopped
     mem_limit: 512m
     depends_on:
-      - chrome
+      chrome:
+        condition: service_healthy
     environment:
         CHROME_HOST: ${chrome_host}
         CHROME_PORT: ${chrome_port}
@@ -19,17 +20,30 @@ services:
     image: ${chrome_image}:latest
     container_name: ${chrome_name}
     network_mode: bridge
+    init: true
+    mem_limit: 3g
     ports:
       - ${chrome_port}:4444
       - ${chrome_vnc_port}:7900
     environment:
       - SE_NODE_OVERRIDE_MAX_SESSIONS=true
       - SE_NODE_MAX_SESSIONS=${chrome_max_sessions}
+      - SE_NODE_SESSION_TIMEOUT=120
       - VNC_NO_PASSWORD=1
     tmpfs:
       - /tmp:size=2g
       - /dev/shm:size=2g
     restart: unless-stopped
+    # Liveness probe: passes whenever the grid HTTP endpoint responds (even with all
+    # slots busy). Fails only if the grid process is hung/dead. Note: `check-grid.sh`
+    # is a *readiness* probe that reports "not ready" whenever slots are occupied, so it
+    # false-fails during normal polling — do not use it here.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -m 5 http://localhost:4444/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 networks:
   host:
     external: true

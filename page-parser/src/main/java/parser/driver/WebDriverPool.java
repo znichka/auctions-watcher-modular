@@ -16,12 +16,21 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Component
 @Log
 public class WebDriverPool {
+    // Upper bound for a single render, comfortably above the 60s condition wait plus scrolling.
+    // Guarantees a wedged Chrome session can never hold a pool slot indefinitely.
+    private static final Duration RENDER_TIMEOUT = Duration.ofSeconds(150);
+    private static final Duration PAGE_LOAD_TIMEOUT = Duration.ofSeconds(60);
+
     @Autowired
     private ObjectFactory<AutoCloseableWebDriver> webDriverProvider;
 
@@ -37,6 +46,7 @@ public class WebDriverPool {
             log.info("Obtaining WebDriver for "+url);
             AutoCloseableWebDriver driver = webDriverProvider.getObject();
             try ( driver  ) {
+                driver.manage().timeouts().pageLoadTimeout(PAGE_LOAD_TIMEOUT);
                 driver.get(url);
 
                 WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(60));
@@ -60,6 +70,25 @@ public class WebDriverPool {
 
         };
 
-        return executor.submit(callable).get();
+        try {
+            return submitBounded(callable);
+        } catch (Exception e) {
+            // A new-session failure (e.g. transient grid/Chrome resource pressure) is worth one retry.
+            log.warning(String.format("Render failed for %s, retrying once. Cause: %s", url, e.getMessage()));
+            return submitBounded(callable);
+        }
+    }
+
+    private String submitBounded(Callable<String> callable) throws Exception {
+        Future<String> future = executor.submit(callable);
+        try {
+            return future.get(RENDER_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            // Interrupt the worker so try-with-resources quits the wedged session and frees the slot.
+            future.cancel(true);
+            throw e;
+        } catch (ExecutionException e) {
+            throw (e.getCause() instanceof Exception cause) ? cause : e;
+        }
     }
 }
