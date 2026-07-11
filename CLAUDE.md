@@ -204,7 +204,15 @@ Three more standalone `docker-compose` deployments, each with its own `-up.sh` a
   Telegram contact point. The contact point (`contact-points.yaml`) is generated at deploy time from
   `contact-points.yaml.template` by `grafana-up.sh`, substituting the bot token/chat id from
   `grafana-alerting-params.env` — not committed, since Grafana's own `$__env{}` provisioning macro
-  coerces a numeric-looking chat id into a JSON number and fails schema validation.
+  coerces a numeric-looking chat id into a JSON number and fails schema validation. The Telegram
+  message body is overridden (`settings.message` in the template, `parse_mode: HTML`) to render via
+  a custom notification template, `telegram.message`, provisioned from
+  `provisioning/alerting/templates.yaml` — without it Grafana's default template dumps every label,
+  including the noisy `container_label_com_docker_compose_*`/`org_opencontainers_image_*` labels
+  cAdvisor/Docker Compose attach, which is unreadable in a Telegram message. The custom template
+  renders one line per alert (firing/resolved + alert name) plus the rule's `summary` annotation, so
+  every rule in `rules.yaml` must keep a human-readable `summary` annotation for the notification to
+  make sense.
 
 ## Adding a new marketplace parser
 
