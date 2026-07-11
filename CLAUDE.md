@@ -47,6 +47,10 @@ apps that talk over HTTP:
 ### `watchers-manager` — stateful orchestrator
 - REST CRUD under `ConfigurationController`: `/bots` (managers), `/bots/{id}`,
   `/bots/{id}/pages`, `DELETE /bots/{id}/pages/{pageId}`, `/health`.
+- API docs via `springdoc-openapi-starter-webmvc-ui`: Swagger UI at `/swagger-ui/index.html`, raw
+  spec at `/v3/api-docs`. No extra config beyond the dependency — it auto-discovers
+  `ConfigurationController`. Both are gated by the same Basic auth as the rest of the API (see
+  Security below); there's no separate permitAll rule for them.
 - Domain model (JPA entities in `watcherbot.description`): a **`ManagerDescription`** = one
   Telegram bot (embedded `TelegramBotCredentials` token + chatId, plus a set of pages). A
   **`PageDescription`** = one watched URL with a polling `period` (minutes).

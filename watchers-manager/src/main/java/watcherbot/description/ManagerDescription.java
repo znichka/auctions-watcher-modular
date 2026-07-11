@@ -1,5 +1,6 @@
 package watcherbot.description;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,19 +14,24 @@ import java.util.Set;
 @Getter
 @Entity
 @Table(name = "managers")
+@Schema(description = "One Telegram bot: its credentials plus the set of marketplace pages it watches")
 public class ManagerDescription {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Getter @Setter
+    @Schema(description = "Auto-generated manager id", accessMode = Schema.AccessMode.READ_ONLY)
     int id;
 
     @Embedded
+    @Schema(description = "Telegram bot credentials")
     TelegramBotCredentials credentials;
 
     @Column
+    @Schema(description = "Human-readable label for this bot/manager", example = "Antique clocks watcher")
     String name;
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @Schema(description = "Pages currently watched by this manager")
     Set<PageDescription> pages = new HashSet<>();
 
     public ManagerDescription setCredentials(TelegramBotCredentials credentials) {
