@@ -21,9 +21,9 @@ apps that talk over HTTP:
   Unsupported hosts throw `OperationNotSupportedException`.
 - Each marketplace parser lives in `parser.parsers.page` and extends one of two bases:
   - `AbstractPageParser` — fetches the page directly with **Jsoup** (`getDocument`). Used by
-    Avito, Ay, Etsy, Kufar.
+    Ay, Etsy, Kufar.
   - `SeleniumAbstractPageParser` — renders the page through a headless Chrome `WebDriverPool`,
-    then hands the HTML to Jsoup. Used by Meshok, Ebay, Olx. These also declare an
+    then hands the HTML to Jsoup. Used by Meshok, Ebay, Olx, Avito. These also declare an
     `expectedCondition()` (a Selenium `ExpectedCondition` the pool waits on) and may set
     `scroll = true` to trigger lazy loading. Falls back to plain Jsoup if no WebDriver is available.
 - A parser implements three methods: `getElementCardsList(doc)` (select item cards),
@@ -116,7 +116,9 @@ copy `target/classes` + `target/dependency` onto the classpath) → `docker-comp
   (default `ssh://nas`), `$2` = the env file passed to `docker-compose --env-file` (default varies
   per script, e.g. `../nas-prod-params.env`). Run with no args to deploy to the usual target;
   pass args to point at a different host/env, e.g. `./page-parser-up.sh ssh://other-host
-  ../oracle-prod-params.env`.
+  ../oracle-prod-params.env`. `grafana-up.sh` additionally takes a third, `$3` = the alerting env
+  file (default `../grafana-alerting-params.env`), used to render the Telegram contact point (see
+  Monitoring stack below).
 - **The two apps and the Chrome container are deployed by three separate `docker-compose` runs:**
   - `watchers-manager-up.sh` deploys the manager via `template-manager-compose.yml`.
   - `page-parser-up.sh` deploys **only the parser**, via `template-parser-compose-without-chrome.yml`
@@ -130,19 +132,20 @@ copy `target/classes` + `target/dependency` onto the classpath) → `docker-comp
     `chrome_max_sessions`) and can run alongside it without conflict. It also needs
     `--env-file ../nas-prod-params.env` to resolve `chrome_max_sessions`.
 - Runtime values come from `*-params.env` files at the repo root (e.g. `nas-prod-params.env`,
-  `prometheus-params.env`, `cadvisor-params.env`, `grafana-params.env`): container names, ports, DB
-  credentials, and Selenium settings. **These env files contain real secrets (DB password) — do not
-  echo, log, or commit changes that expose them.** They're `.gitignore`d (`*.env`), so this is safe
-  by default even for new ones.
+  `prometheus-params.env`, `cadvisor-params.env`, `grafana-params.env`, `grafana-alerting-params.env`):
+  container names, ports, DB credentials, and Selenium settings. **These env files contain real
+  secrets (DB password, Telegram bot token) — do not echo, log, or commit changes that expose
+  them.** They're `.gitignore`d (`*.env`), so this is safe by default even for new ones.
 - The parser reaches Chrome at `chrome_host:chrome_port`; `chrome_max_sessions` must match
   `selenium.sessions.max` (the parser's `selenium.sessions.max` is bound to the container's
   `SE_NODE_MAX_SESSIONS`).
 - **Chrome container failure mode (recurring):** `/tmp` and `/dev/shm` are RAM-backed tmpfs. If
   leaked Chrome profiles fill `/tmp`, new sessions fail with `session not created: DevToolsActivePort
   file doesn't exist` (HTTP 500) — the container stays "up"/healthy but every Selenium site (meshok,
-  ebay, olx) returns zero items and the app silently stops delivering. Mitigations already in place:
-  Chrome runs `--headless=new` and uses `/dev/shm` (no `--disable-dev-shm-usage`), plus
-  `SE_NODE_SESSION_TIMEOUT` and `init: true` to reap stuck sessions/zombies. First diagnostic:
+  ebay, olx, avito) returns zero items and the app silently stops delivering. Mitigations already in
+  place: Chrome runs `--headless=new` and uses `/dev/shm` (no `--disable-dev-shm-usage`), plus
+  `SE_NODE_SESSION_TIMEOUT`, `init: true` to reap stuck sessions/zombies, and
+  `SE_ENABLE_BROWSER_LEFTOVERS_CLEANUP=true` to clean up orphaned Chrome profiles. First diagnostic:
   `docker exec auctions-chrome df -h /tmp`. The compose healthcheck is a liveness probe (does the
   grid HTTP respond) — it does **not** trigger a restart on its own.
 
@@ -167,7 +170,12 @@ Three more standalone `docker-compose` deployments, each with its own `-up.sh` a
   (`grafana/provisioning/datasources/datasource.yml`, baked into the image like Prometheus's
   config) pointed at `http://localhost:9090`; this only works because Grafana runs with
   `network_mode: host`, same as the two apps and Prometheus. Dashboards persist in a named Docker
-  volume. Port 3000.
+  volume. Port 3000. Also provisions alerting (`grafana/provisioning/alerting/{policies,rules}.yaml`)
+  with rules for scrape-target-down, container-stopped, and container-restarted, notifying via a
+  Telegram contact point. The contact point (`contact-points.yaml`) is generated at deploy time from
+  `contact-points.yaml.template` by `grafana-up.sh`, substituting the bot token/chat id from
+  `grafana-alerting-params.env` — not committed, since Grafana's own `$__env{}` provisioning macro
+  coerces a numeric-looking chat id into a JSON number and fails schema validation.
 
 ## Adding a new marketplace parser
 
