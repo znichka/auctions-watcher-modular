@@ -30,6 +30,7 @@ services:
       - SE_NODE_MAX_SESSIONS=${chrome_max_sessions}
       - SE_NODE_SESSION_TIMEOUT=120
       - VNC_NO_PASSWORD=1
+      - SE_ENABLE_BROWSER_LEFTOVERS_CLEANUP=true
     tmpfs:
       - /tmp:size=2g
       - /dev/shm:size=2g
