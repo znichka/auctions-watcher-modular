@@ -17,6 +17,8 @@ services:
         PARSER_HOST: ${parser_host}
         PARSER_PORT: ${parser_port}
         SERVER_PORT: ${manager_port}
+        API_USER: ${api_user}
+        API_PASSWORD: ${api_password}
         TZ: Europe/Warsaw
 #  db:
 #    image: postgres

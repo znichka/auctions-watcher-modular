@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Keep this file up to date.** After making an important change to the codebase (architecture,
+auth/security, deployment process, new services, changed endpoints, etc.), update the relevant
+section of this file in the same piece of work — don't leave it to a future session to notice the
+drift.
+
 ## What this is
 
 A notifier for new items appearing on auction marketplaces. Watched pages are polled on a
@@ -59,6 +64,18 @@ apps that talk over HTTP:
 - Telegram delivery: `TelegramBotSender` calls the Telegram HTTP API directly; the primary path
   (`sendItemDescription`) uploads the photo bytes as multipart with an HTML caption linking to the
   item. `SenderQueue` serializes all sends through a single-thread executor.
+- **Security**: `SecurityConfig` (`watcherbot.config`) requires HTTP Basic auth on every endpoint
+  except `/health` and `/actuator/**` (left open for uptime checks and Prometheus scraping).
+  Credentials come from `spring.security.user.name`/`password`, bound to the `API_USER`/
+  `API_PASSWORD` env vars in prod (see Deployment) and hardcoded to `dev`/`dev` in the `dev`
+  profile. Path matching must use `AntPathRequestMatcher` explicitly, not bare string patterns —
+  because `h2database` is a runtime (not test-scoped) dependency, prod has both the H2 console
+  servlet and the main `DispatcherServlet` mapped, and Spring Security can't auto-resolve MVC-style
+  matchers when more than one servlet is present (it throws at startup). The `@WebMvcTest` in
+  `ConfigurationControllerTest` bypasses the filter chain entirely via
+  `@AutoConfigureMockMvc(addFilters = false)`, so it won't catch security-config regressions —
+  verify auth changes by booting the app for real (e.g. `-Dspring.profiles.active=dev`) before
+  redeploying.
 
 ### Cross-module note
 `ItemDescription` is **duplicated** in both modules (`parser.data` and `watcherbot.description`)
@@ -133,9 +150,11 @@ copy `target/classes` + `target/dependency` onto the classpath) → `docker-comp
     `--env-file ../nas-prod-params.env` to resolve `chrome_max_sessions`.
 - Runtime values come from `*-params.env` files at the repo root (e.g. `nas-prod-params.env`,
   `prometheus-params.env`, `cadvisor-params.env`, `grafana-params.env`, `grafana-alerting-params.env`):
-  container names, ports, DB credentials, and Selenium settings. **These env files contain real
-  secrets (DB password, Telegram bot token) — do not echo, log, or commit changes that expose
-  them.** They're `.gitignore`d (`*.env`), so this is safe by default even for new ones.
+  container names, ports, DB credentials, Selenium settings, and the `watchers-manager` API's
+  `api_user`/`api_password` (wired to `API_USER`/`API_PASSWORD` in `template-manager-compose.yml`,
+  see Security above). **These env files contain real secrets (DB password, Telegram bot token,
+  API credentials) — do not echo, log, or commit changes that expose them.** They're `.gitignore`d
+  (`*.env`), so this is safe by default even for new ones.
 - The parser reaches Chrome at `chrome_host:chrome_port`; `chrome_max_sessions` must match
   `selenium.sessions.max` (the parser's `selenium.sessions.max` is bound to the container's
   `SE_NODE_MAX_SESSIONS`).
@@ -169,8 +188,14 @@ Three more standalone `docker-compose` deployments, each with its own `-up.sh` a
 - **Grafana** (`grafana/grafana-up.sh`) — auto-provisions a Prometheus datasource
   (`grafana/provisioning/datasources/datasource.yml`, baked into the image like Prometheus's
   config) pointed at `http://localhost:9090`; this only works because Grafana runs with
-  `network_mode: host`, same as the two apps and Prometheus. Dashboards persist in a named Docker
-  volume. Port 3000. Also provisions alerting (`grafana/provisioning/alerting/{policies,rules}.yaml`)
+  `network_mode: host`, same as the two apps and Prometheus. The dashboard itself
+  (`grafana/provisioning/dashboards/auctions-watcher.json`) is file-provisioned the same way —
+  edit it and redeploy to change panels/queries. It's gitignored (blanket `*.json` rule) but lives
+  on disk in this repo like any other file. The named Docker volume (`/var/lib/grafana`) only
+  persists Grafana's own runtime DB (users, session state, UI-made tweaks since
+  `allowUiUpdates: true`) — not the dashboard definition, which is re-synced from the JSON file on
+  each start (`updateIntervalSeconds: 30`). Port 3000. Also provisions alerting
+  (`grafana/provisioning/alerting/{policies,rules}.yaml`)
   with rules for scrape-target-down, container-stopped, and container-restarted, notifying via a
   Telegram contact point. The contact point (`contact-points.yaml`) is generated at deploy time from
   `contact-points.yaml.template` by `grafana-up.sh`, substituting the bot token/chat id from
