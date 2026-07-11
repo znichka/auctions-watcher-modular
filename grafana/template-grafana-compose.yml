@@ -1,0 +1,16 @@
+---
+version: "2.4"
+services:
+  grafana:
+    image: local/auctions-grafana
+    container_name: auctions-grafana
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - GF_SERVER_HTTP_PORT=${grafana_port}
+    volumes:
+      - grafana-data:/var/lib/grafana
+volumes:
+  grafana-data:
+    external: true
+    name: ${grafana_volume}

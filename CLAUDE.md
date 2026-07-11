@@ -146,6 +146,29 @@ copy `target/classes` + `target/dependency` onto the classpath) → `docker-comp
   `docker exec auctions-chrome df -h /tmp`. The compose healthcheck is a liveness probe (does the
   grid HTTP respond) — it does **not** trigger a restart on its own.
 
+### Monitoring stack
+
+Three more standalone `docker-compose` deployments, each with its own `-up.sh` and `*-params.env`:
+
+- **Prometheus** (`prometheus/prometheus-up.sh`) — config (`prometheus.yml`) is baked into a custom
+  image at build time (`COPY prometheus.yml /etc/prometheus/prometheus.yml`), so changing scrape
+  targets means editing that file and rerunning the up-script, not a live-reloadable mount. Scrapes
+  `watchers-manager` and `page-parser` at `/actuator/prometheus` (both expose Micrometer metrics via
+  `spring-boot-starter-actuator` + `micrometer-registry-prometheus`), plus `cadvisor` at `/metrics`.
+  UI on port 9090.
+- **cAdvisor** (`cadvisor/cadvisor-up.sh`) — reports per-container memory/CPU stats (e.g.
+  `container_memory_usage_bytes`, `container_spec_memory_limit_bytes`,
+  `container_cpu_usage_seconds_total`, all labeled `name="<container_name>"`) for **every**
+  container on the host, not just one. Runs unprivileged with read-only mounts of `/rootfs`,
+  `/var/run`, `/sys`, `/var/lib/docker` — sufficient for memory/CPU on this host's cgroup v2 +
+  overlay2 setup, though some peripheral stats (per-disk I/O, some hardware metrics) may be
+  incomplete. Port 8081.
+- **Grafana** (`grafana/grafana-up.sh`) — auto-provisions a Prometheus datasource
+  (`grafana/provisioning/datasources/datasource.yml`, baked into the image like Prometheus's
+  config) pointed at `http://localhost:9090`; this only works because Grafana runs with
+  `network_mode: host`, same as the two apps and Prometheus. Dashboards persist in a named Docker
+  volume. Port 3000.
+
 ## Adding a new marketplace parser
 
 1. Create a class in `parser.parsers.page` extending `AbstractPageParser` (Jsoup-only) or

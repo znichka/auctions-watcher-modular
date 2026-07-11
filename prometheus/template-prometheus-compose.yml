@@ -1,0 +1,14 @@
+---
+version: "2.1"
+services:
+  prometheus:
+    image: local/auctions-prometheus
+    container_name: auctions-prometheus
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - prometheus-data:/prometheus
+volumes:
+  prometheus-data:
+    external: true
+    name: ${prometheus_volume}
