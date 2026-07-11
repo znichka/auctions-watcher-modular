@@ -9,3 +9,8 @@ scrape_configs:
       # (manager listens on IPv4 only), so target the NAS's LAN IP instead.
       # keep this port in sync with manager_port in ../nas-prod-params.env
       - targets: ['192.168.0.18:8090']
+  - job_name: 'page-parser'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # keep this port in sync with parser_port in ../nas-prod-params.env
+      - targets: ['192.168.0.18:8190']

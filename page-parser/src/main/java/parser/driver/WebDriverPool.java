@@ -1,5 +1,7 @@
 package parser.driver;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.SneakyThrows;
 import lombok.extern.java.Log;
 
@@ -18,8 +20,9 @@ import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -35,9 +38,17 @@ public class WebDriverPool {
     private ObjectFactory<AutoCloseableWebDriver> webDriverProvider;
 
     private final ExecutorService executor;
+    private final Timer acquireWaitTimer;
 
-    public WebDriverPool(@Value("${selenium.sessions.max:1}") int poolSize) {
-        executor = Executors.newFixedThreadPool(poolSize);
+    public WebDriverPool(@Value("${selenium.sessions.max:1}") int poolSize, MeterRegistry registry) {
+        ThreadPoolExecutor pool = new ThreadPoolExecutor(
+                poolSize, poolSize, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+        registry.gauge("webdriver.pool.queue.depth", pool.getQueue(), q -> q.size());
+        executor = pool;
+        acquireWaitTimer = Timer.builder("webdriver.pool.acquire.wait")
+                .publishPercentileHistogram()
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .register(registry);
     }
 
     @SneakyThrows
@@ -80,7 +91,12 @@ public class WebDriverPool {
     }
 
     private String submitBounded(Callable<String> callable) throws Exception {
-        Future<String> future = executor.submit(callable);
+        long enqueuedAt = System.nanoTime();
+        Callable<String> timed = () -> {
+            acquireWaitTimer.record(System.nanoTime() - enqueuedAt, TimeUnit.NANOSECONDS);
+            return callable.call();
+        };
+        Future<String> future = executor.submit(timed);
         try {
             return future.get(RENDER_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
