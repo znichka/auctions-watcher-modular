@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'watchers-manager'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # localhost resolved to ::1 inside the container and got connection refused
+      # (manager listens on IPv4 only), so target the NAS's LAN IP instead.
+      # keep this port in sync with manager_port in ../nas-prod-params.env
+      - targets: ['192.168.0.18:8090']
