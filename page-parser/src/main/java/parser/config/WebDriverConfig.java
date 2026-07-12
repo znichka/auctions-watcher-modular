@@ -31,6 +31,12 @@ public class WebDriverConfig {
         options.setExperimentalOption("excludeSwitches", java.util.List.of("enable-automation"));
         options.addArguments("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36");
         options.addArguments("--remote-allow-origins=*");
+        options.addArguments("--disable-background-networking");
+        options.addArguments("--disable-component-update");
+        options.addArguments("--disable-domain-reliability");
+        options.addArguments("--disable-client-side-phishing-detection");
+        options.addArguments("--disable-sync");
+        options.addArguments("--disable-default-apps");
 
         return new AutoCloseableWebDriver(new ChromeDriver(options));
     }
@@ -48,7 +54,12 @@ public class WebDriverConfig {
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.setExperimentalOption("excludeSwitches", java.util.List.of("enable-automation"));
         options.addArguments("--remote-allow-origins=*");
-
+        options.addArguments("--disable-background-networking");
+        options.addArguments("--disable-component-update");
+        options.addArguments("--disable-domain-reliability");
+        options.addArguments("--disable-client-side-phishing-detection");
+        options.addArguments("--disable-sync");
+        options.addArguments("--disable-default-apps");
 
         WebDriver driver = null;
         try {

@@ -176,9 +176,34 @@ copy `target/classes` + `target/dependency` onto the classpath) → `docker-comp
   ebay, olx, avito) returns zero items and the app silently stops delivering. Mitigations already in
   place: Chrome runs `--headless=new` and uses `/dev/shm` (no `--disable-dev-shm-usage`), plus
   `SE_NODE_SESSION_TIMEOUT`, `init: true` to reap stuck sessions/zombies, and
-  `SE_ENABLE_BROWSER_LEFTOVERS_CLEANUP=true` to clean up orphaned Chrome profiles. First diagnostic:
-  `docker exec auctions-chrome df -h /tmp`. The compose healthcheck is a liveness probe (does the
-  grid HTTP respond) — it does **not** trigger a restart on its own.
+  `SE_ENABLE_BROWSER_LEFTOVERS_CLEANUP=true`. First diagnostic: `docker exec auctions-chrome df -h
+  /tmp`.
+  - **`SE_ENABLE_BROWSER_LEFTOVERS_CLEANUP` alone is not sufficient** — confirmed 2026-07-12. The
+    image's built-in daemon (`/opt/bin/chrome-cleanup.sh`, runs hourly by default) only deletes
+    leftover dirs via `find /tmp -name "*com.google.Chrome.*" -type d -mtime
+    +${SE_BROWSER_LEFTOVERS_TEMPFILES_DAYS}`. Neither compose file (nor any `*-params.env`) sets
+    `SE_BROWSER_LEFTOVERS_TEMPFILES_DAYS`, so it runs at the image's built-in default of `1` (a full
+    day) — confirmed via `docker exec auctions-chrome env`. **This threshold can't usefully be tuned
+    lower**: GNU `find`'s `-mtime` silently truncates fractional values (e.g. `+0.1` behaves exactly
+    like `+0`), and `-mtime +0` still requires ~24h of age due to whole-day bucketing — there is no
+    env-var way to get sub-day cleanup out of this script (tested directly on the container; don't
+    add `SE_BROWSER_LEFTOVERS_TEMPFILES_DAYS` to the compose files expecting it to help). So if
+    leftover-dir creation is fast enough to fill the 2GB tmpfs in under 24h (observed: ~330 dirs/hour,
+    saturated in ~8h), the built-in cleanup structurally never gets a chance to run before disk is
+    full, regardless of the flag.
+  - The dirs in question (`com.google.Chrome.chrome_chrome_url_fetcher_.*`) are created by Chrome's
+    background network fetches (component updater, safe-browsing, domain reliability, sync,
+    client-side phishing detection) — one or more per session launch. Fix applied in
+    `WebDriverConfig.java`: both `ChromeOptions` blocks now pass `--disable-background-networking`,
+    `--disable-component-update`, `--disable-domain-reliability`,
+    `--disable-client-side-phishing-detection`, `--disable-sync`, `--disable-default-apps` to stop
+    these fetches (and their temp dirs) from being created in the first place, rather than relying on
+    cleanup after the fact.
+  - Manual remediation when `/tmp` is already full: `docker exec auctions-chrome sh -c 'find /tmp
+    -maxdepth 1 -name "*com.google.Chrome.*" -exec rm -rf {} +'` (note `-rf`, not `-f` — these are
+    directories, not files).
+  - The compose healthcheck is a liveness probe (does the grid HTTP respond) — it does **not**
+    trigger a restart on its own.
 
 ### Monitoring stack
 
