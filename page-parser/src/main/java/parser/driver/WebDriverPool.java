@@ -16,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.net.URI;
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -69,8 +68,10 @@ public class WebDriverPool {
                 driver.manage().timeouts().pageLoadTimeout(PAGE_LOAD_TIMEOUT);
 
                 if (warmup) {
-                    URI uri = URI.create(url);
-                    driver.get(uri.getScheme() + "://" + uri.getHost());
+                    // Avoid java.net.URI parsing here: several configured search URLs contain
+                    // unencoded spaces in the query string, which Selenium's driver.get() tolerates
+                    // fine but URI.create() rejects with IllegalArgumentException.
+                    driver.get(url.replaceFirst("^(https?://[^/]+).*$", "$1"));
                 }
 
                 driver.get(url);

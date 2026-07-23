@@ -39,7 +39,13 @@ apps that talk over HTTP:
     reliably outside the app via raw Selenium Grid sessions. Without the warmup visit this silently
     returns zero items (not an exception), which looks exactly like "no new listings" rather than a
     failure — worth checking first if a Selenium-backed source (especially eBay) mysteriously stops
-    producing notifications.
+    producing notifications. **The warmup navigation must not parse `url` with `java.net.URI`** —
+    fixed 2026-07-23 after the first `warmup` implementation used `URI.create(url)` to derive the
+    homepage origin and broke ~80% of configured eBay searches within hours of deploy: many stored
+    eBay search URLs contain unencoded spaces in the query string (e.g. `_nkw=glass garland`), which
+    Selenium's `driver.get(url)` tolerates but `URI.create()` rejects with
+    `IllegalArgumentException`. The homepage origin is now derived with a plain
+    `url.replaceFirst("^(https?://[^/]+).*$", "$1")` instead.
 - A parser implements three methods: `getElementCardsList(doc)` (select item cards),
   `getItemFromCard(card)` (extract one `ItemDescription`), `getDomainName()`. Per-item parse
   errors are caught and skipped — a broken card never fails the whole page.
