@@ -12,6 +12,13 @@ import parser.parsers.SeleniumAbstractPageParser;
 
 @Component
 public class EbayPageParser extends SeleniumAbstractPageParser {
+    public EbayPageParser() {
+        // eBay blocks a fresh session that navigates straight to a search/category URL
+        // (returns a bot-block "Error Page") but allows it once the session has visited
+        // the eBay homepage first to pick up cookies.
+        warmup = true;
+    }
+
     @Override
     protected ExpectedCondition<?> expectedCondition() {
         return ExpectedConditions.or(
@@ -23,7 +30,12 @@ public class EbayPageParser extends SeleniumAbstractPageParser {
     @Override
     public Elements getElementCardsList(Document doc) {
         // Search results page (/sch/)
-        Elements searchCards = doc.select("li.s-card");
+        // li.s-card also matches a hidden accessibility decoy card (wrapped in
+        // div.s-clipped[aria-hidden=true], fake id/url like .../itm/123456) - exclude it.
+        Elements searchCards = new Elements();
+        for (Element card : doc.select("li.s-card")) {
+            if (card.closest(".s-clipped") == null) searchCards.add(card);
+        }
         if (!searchCards.isEmpty()) {
             Element count = doc.getElementsByClass("srp-controls__count-heading").first();
             if (count != null) {

@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -53,11 +54,25 @@ public class WebDriverPool {
 
     @SneakyThrows
     public String get(String url, boolean scroll, ExpectedCondition<?> expectedCondition) {
+        return get(url, scroll, false, expectedCondition);
+    }
+
+    // Some sites (e.g. eBay) block a fresh session that navigates straight to a deep link
+    // (e.g. a search results page) with no prior visit/cookies, but allow it once the session
+    // has loaded the site's homepage first. `warmup` opts a parser into that homepage visit.
+    @SneakyThrows
+    public String get(String url, boolean scroll, boolean warmup, ExpectedCondition<?> expectedCondition) {
         Callable<String> callable = () -> {
             log.info("Obtaining WebDriver for "+url);
             AutoCloseableWebDriver driver = webDriverProvider.getObject();
             try ( driver  ) {
                 driver.manage().timeouts().pageLoadTimeout(PAGE_LOAD_TIMEOUT);
+
+                if (warmup) {
+                    URI uri = URI.create(url);
+                    driver.get(uri.getScheme() + "://" + uri.getHost());
+                }
+
                 driver.get(url);
 
                 WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(60));

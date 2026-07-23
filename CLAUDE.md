@@ -30,7 +30,16 @@ apps that talk over HTTP:
   - `SeleniumAbstractPageParser` — renders the page through a headless Chrome `WebDriverPool`,
     then hands the HTML to Jsoup. Used by Meshok, Ebay, Olx, Avito. These also declare an
     `expectedCondition()` (a Selenium `ExpectedCondition` the pool waits on) and may set
-    `scroll = true` to trigger lazy loading. Falls back to plain Jsoup if no WebDriver is available.
+    `scroll = true` to trigger lazy loading, or `warmup = true` to have the pool visit the site's
+    homepage first to pick up cookies before navigating to the real URL. Falls back to plain Jsoup
+    if no WebDriver is available. **Ebay sets `warmup = true`**: confirmed 2026-07-23 that eBay
+    serves a bot-block "Error Page" (HTTP-level 403 on subresources, page title "Error Page | eBay")
+    to a fresh session that navigates straight to a `/sch/` or `/b/` URL with no prior visit, but
+    allows it once the session has loaded `https://www.ebay.com` (or `.de`) first — reproduced
+    reliably outside the app via raw Selenium Grid sessions. Without the warmup visit this silently
+    returns zero items (not an exception), which looks exactly like "no new listings" rather than a
+    failure — worth checking first if a Selenium-backed source (especially eBay) mysteriously stops
+    producing notifications.
 - A parser implements three methods: `getElementCardsList(doc)` (select item cards),
   `getItemFromCard(card)` (extract one `ItemDescription`), `getDomainName()`. Per-item parse
   errors are caught and skipped — a broken card never fails the whole page.

@@ -21,10 +21,14 @@ public abstract class SeleniumAbstractPageParser extends AbstractPageParser  {
 
     protected boolean scroll = false;
 
+    // Some sites block a fresh session navigating straight to a deep link; set true to have
+    // the pool visit the site's homepage first to pick up cookies. See WebDriverPool.get.
+    protected boolean warmup = false;
+
     @Override
     protected Document getDocument(String url) throws IOException {
         try {
-            return Jsoup.parse(webDriverPool.get(url, scroll, expectedCondition()));
+            return Jsoup.parse(webDriverPool.get(url, scroll, warmup, expectedCondition()));
         } catch (BeansException e) {
             log.warning(String.format("Web driver for parser %s is not available, falling back to default parsing method", this.getDomainName()));
             return super.getDocument(url);
