@@ -10,15 +10,18 @@ import watcherbot.description.TelegramBotCredentials;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 @Component
 @Log
 public class SenderQueue {
-    ThreadPoolExecutor executorService = new ThreadPoolExecutor(
-            1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+    private static final int MAX_ATTEMPTS = 3;
+    private static final long MIN_INTERVAL_MILLIS = 1100;
+    private static final long DEFAULT_RETRY_DELAY_SECONDS = 5;
+
+    ScheduledThreadPoolExecutor executorService = new ScheduledThreadPoolExecutor(1);
+    long lastSendAtMillis = 0;
     Timer waitTimer;
 
     @Autowired
@@ -34,20 +37,44 @@ public class SenderQueue {
     }
 
     public void send(TelegramBotCredentials credentials, ItemDescription item) {
-        long enqueuedAt = System.nanoTime();
-        executorService.submit(() -> {
-            waitTimer.record(System.nanoTime() - enqueuedAt, TimeUnit.NANOSECONDS);
-            try {
-                sender.sendItemDescription(credentials, item);
-            } catch (IOException e) {
-                log.severe(String.format("Error while sending item details to telegram bot %s. Item photo url: %s, item url: %s", credentials.getToken(), item.getPhotoUrl(), item.getItemUrl()));
-            }
-        });
+        trySend(credentials, item, System.nanoTime(), 1);
     }
 
     public void send(TelegramBotCredentials credentials, List<ItemDescription> items){
         for (var item : items) {
             send(credentials, item);
         }
+    }
+
+    private void trySend(TelegramBotCredentials credentials, ItemDescription item, long enqueuedAt, int attempt) {
+        executorService.submit(() -> {
+            waitTimer.record(System.nanoTime() - enqueuedAt, TimeUnit.NANOSECONDS);
+            pace();
+            try {
+                sender.sendItemDescription(credentials, item);
+            } catch (TelegramRateLimitException e) {
+                if (attempt < MAX_ATTEMPTS) {
+                    long delaySeconds = e.getRetryAfterSeconds() != null ? e.getRetryAfterSeconds() : DEFAULT_RETRY_DELAY_SECONDS;
+                    log.warning(String.format("Rate limited by Telegram, retrying item %s in %ds (attempt %d/%d)", item.getItemUrl(), delaySeconds, attempt + 1, MAX_ATTEMPTS));
+                    executorService.schedule(() -> trySend(credentials, item, System.nanoTime(), attempt + 1), delaySeconds, TimeUnit.SECONDS);
+                } else {
+                    log.severe(String.format("Giving up sending item to telegram bot %s after %d attempts due to rate limiting. Item url: %s", credentials.getToken(), MAX_ATTEMPTS, item.getItemUrl()));
+                }
+            } catch (IOException e) {
+                log.severe(String.format("Error while sending item details to telegram bot %s. Item photo url: %s, item url: %s. Cause: %s", credentials.getToken(), item.getPhotoUrl(), item.getItemUrl(), e.getMessage()));
+            }
+        });
+    }
+
+    private void pace() {
+        long waitMillis = MIN_INTERVAL_MILLIS - (System.currentTimeMillis() - lastSendAtMillis);
+        if (waitMillis > 0) {
+            try {
+                Thread.sleep(waitMillis);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        lastSendAtMillis = System.currentTimeMillis();
     }
 }
