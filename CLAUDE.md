@@ -104,9 +104,33 @@ fields (`id`, `itemUrl`, `photoUrl`, `caption`) in sync across both copies when 
 ### Persistence
 - Production: PostgreSQL. `spring.jpa.hibernate.ddl-auto=none` everywhere — **the DB schema is
   managed externally, not by Hibernate**. The `managers`/`pages` tables back JPA entities; the
-  `items` table is accessed only via raw SQL. Adding/altering tables means changing the DB by hand.
+  `items` table is accessed only via raw SQL. Adding/altering tables means changing the DB by hand,
+  by running `watchers-manager/src/main/resources/schema.sql` against the target DB — that file is
+  only auto-applied by Spring for the `dev` profile (`spring.sql.init.mode=always` gated to
+  `spring.sql.init.platform=dev` in `application-dev.properties`); prod does not run it
+  automatically, so a fresh prod DB starts out with no tables until you run it by hand.
 - Dev/test: in-memory H2 in PostgreSQL-compatibility mode (`application-dev.properties` for the
   `dev` profile; `src/test/resources/application.properties` for tests).
+- **Where prod Postgres actually runs is per-environment**, set via `db_host`/`db_port` in each
+  environment's `*-params.env`: `oracle-prod`/`oracle-test`/`oracle-dev` each run their own local
+  `db` service (`db_host=localhost`) — see the `db` service in
+  `watchers-manager/template-manager-compose.yml`, alongside `manager` in the same compose file,
+  data on the external Docker volume `${db_volume}`. **`nas-prod` originally pointed `db_host` at
+  an external Oracle Cloud Always-Free instance's public IP** instead of running its own `db`
+  service (that block was commented out in the compose file) — as of 2026-08-26 that Oracle
+  instance was permanently reclaimed by Oracle (Always Free instances get force-stopped when a
+  trial account's resource plan lapses) and its boot volume proved unrecoverable without upgrading
+  off the free tier, which was declined. **nas-prod now runs its own local `db` service** like the
+  oracle-* environments — the commented-out block in `template-manager-compose.yml` was uncommented
+  and is live. All dedup/manager/page history from the old Oracle-hosted DB was lost; nas-prod
+  started from an empty schema (applied by hand per the paragraph above) on that date.
+- **Pin the `db` service's image to a specific major version (currently `postgres:16`) — never
+  `postgres:latest`.** Confirmed 2026-08-26: `postgres:latest` currently resolves to Postgres 18,
+  whose image changed its expected on-disk layout for 18+ (`pg_ctlcluster`-style, versioned
+  subdirectories under a single `/var/lib/postgresql` mount) and refuses to start at all against
+  this compose file's plain `/var/lib/postgresql/data` bind mount — it crash-loops printing a
+  layout-mismatch error instead of initializing. `postgres:16` starts cleanly against the existing
+  mount as-is.
 
 ## Build, test, run
 

@@ -8,15 +8,15 @@ scrape_configs:
       # localhost resolved to ::1 inside the container and got connection refused
       # (manager listens on IPv4 only), so target the NAS's LAN IP instead.
       # keep this port in sync with manager_port in ../nas-prod-params.env
-      - targets: ['192.168.0.18:8090']
+      - targets: ['192.168.1.7:8090']
   - job_name: 'page-parser'
     metrics_path: /actuator/prometheus
     static_configs:
       # keep this port in sync with parser_port in ../nas-prod-params.env
-      - targets: ['192.168.0.18:8190']
+      - targets: ['192.168.1.7:8190']
   - job_name: 'cadvisor'
     # reports per-container memory/CPU stats for every container on the host
     # (auctions-chrome, auctions-page-parser, auctions-manager, etc.), not just one
     # keep this port in sync with cadvisor_port in ../cadvisor-params.env
     static_configs:
-      - targets: ['192.168.0.18:8081']
+      - targets: ['192.168.1.7:8081']
