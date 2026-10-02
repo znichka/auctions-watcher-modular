@@ -38,12 +38,19 @@ public class PageWatcherService {
         pageDescriptionRepository.save(pageDescription);
 
         getManagerDescription(managerId).addPage(pageDescription);
-        pageDescription = loadPage(pageDescription, managerId);
 
-        if (pageDescription != null) {
+        // Seed the DB with the page's current items (marked as already-seen) before the
+        // scheduled watcher is registered below. Otherwise, for a slow-to-parse source (e.g.
+        // Selenium-backed eBay/Meshok/Olx/Avito), the watcher's own first run (fixed 1-minute
+        // initial delay) can fire and find the table still empty, treating every existing item
+        // as "new" and sending it to the bot's chat before this seeding step gets a chance to run.
+        try {
             parserRequestsProvider.getObject().getItems(pageDescription).forEach(item -> itemsService.insertIfUnique(item, managerId));
+        } catch (Exception e) {
+            log.severe("Error while seeding existing items for " + pageDescription.getDescription() + ": " + e.getMessage());
         }
-        return pageDescription;
+
+        return loadPage(pageDescription, managerId);
     }
 
     public ManagerDescription addManager(ManagerDescription managerDescription) {
