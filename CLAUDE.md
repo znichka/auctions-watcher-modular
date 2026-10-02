@@ -39,7 +39,20 @@ apps that talk over HTTP:
     reliably outside the app via raw Selenium Grid sessions. Without the warmup visit this silently
     returns zero items (not an exception), which looks exactly like "no new listings" rather than a
     failure — worth checking first if a Selenium-backed source (especially eBay) mysteriously stops
-    producing notifications. **The warmup navigation must not parse `url` with `java.net.URI`** —
+    producing notifications. **As of 2026-10-02, eBay's bot-wall (PerimeterX, served as
+    `/splashui/challenge` or `/splashui/captcha`) reliably blocks `/b/` category-browse pages even
+    with warmup** — confirmed via nas's page-parser logs, 0/220 successes for a `/b/` page over ~44h
+    of log retention, vs. ~150/310 for a `/sch/` keyword-search page in the same window. This is
+    **not** a `.de`-vs-`.com` or whole-site IP block: `ebay.de` search pages work fine, only the
+    category-browse endpoint is hit this hard. eBay's own redirect sends a bare `_sacat=`-only
+    search straight back to a `/b/...` URL, so that's not an escape hatch — if a configured eBay
+    page is a `/b/` URL, replace it with an equivalent `/sch/i.html?_nkw=<keyword>` search instead
+    of treating it as a selector bug (fixed this way for the "Ebay.de Christbaumschmuck" bot's
+    page: swapped `/b/Sammler-Christbaum-Feiertagsschmuck/77988/bn_16579797` for
+    `/sch/i.html?_nkw=Christbaumschmuck`). Repeated failed/challenged requests from the same
+    session in a short window appear to escalate the block (challenge → captcha → flat 403 on
+    later requests too) — avoid rapid manual retries against eBay from the same IP while
+    debugging. **The warmup navigation must not parse `url` with `java.net.URI`** —
     fixed 2026-07-23 after the first `warmup` implementation used `URI.create(url)` to derive the
     homepage origin and broke ~80% of configured eBay searches within hours of deploy: many stored
     eBay search URLs contain unencoded spaces in the query string (e.g. `_nkw=glass garland`), which
