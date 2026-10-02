@@ -25,27 +25,19 @@ public class MeshokPageParser extends SeleniumAbstractPageParser {
 
     @Override
     public ItemDescription getItemFromCard(Element card) {
-////        Element cardImage = card.select(".m-item-card-image").first();
-////        if (cardImage != null) {
-//            Element itemTitleElement = card.select("div[class^=itemTitle]").first();
-//            String id = itemTitleElement.attr("data-itemcard");
-//
-//            String itemUrl = "http://meshok.net" + card.selectFirst("a").attr("href");
-//            Element imgElement = card.selectFirst("img");
-//            String photoUrl = null;
-//            if (imgElement != null) photoUrl = "https://meshok.net" + imgElement.attr("src");
-//            String caption = itemTitleElement.text();
-//
-//            return new ItemDescription(id, itemUrl, photoUrl, caption);
-////        }
-////        return null;
+        // As of 2026-09, the card link is a bare `a[class^=wrapper]` (no `data-itemcard`
+        // attribute any more) and the title is a `div[class^=itemTitle]`, not an `<a>`. The
+        // numeric item id now lives on the "watch item" button's `itemid` attribute instead.
+        Element linkElement = card.selectFirst("a[class^=wrapper]");
+        String itemUrl = linkElement != null ? "https://meshok.net" + linkElement.attr("href") : null;
 
-        Element titleElement = card.selectFirst("a[class^=itemTitle]");
-        String id = titleElement != null ? titleElement.attr("data-itemcard") : null;
-        String itemUrl = titleElement != null ? "http://meshok.net" + titleElement.attr("href") : null;
+        Element idElement = card.selectFirst("[itemid]");
+        String id = idElement != null ? idElement.attr("itemid") : null;
+
+        Element titleElement = card.selectFirst("div[class^=itemTitle]");
         String caption = titleElement != null ? titleElement.text() : null;
 
-        Element imgElement = card.selectFirst("a[class^=image] img");
+        Element imgElement = card.selectFirst("div[class^=image] img");
         String photoUrl = null;
         if (imgElement != null) {
             photoUrl = "https://meshok.net" + imgElement.attr("src");
