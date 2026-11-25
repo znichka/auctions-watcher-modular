@@ -49,7 +49,22 @@ apps that talk over HTTP:
     page is a `/b/` URL, replace it with an equivalent `/sch/i.html?_nkw=<keyword>` search instead
     of treating it as a selector bug (fixed this way for the "Ebay.de Christbaumschmuck" bot's
     page: swapped `/b/Sammler-Christbaum-Feiertagsschmuck/77988/bn_16579797` for
-    `/sch/i.html?_nkw=Christbaumschmuck`). Repeated failed/challenged requests from the same
+    `/sch/i.html?_nkw=Christbaumschmuck`). **As of 2026-11-16 the block covers the whole site,
+    `/sch/` searches included, and no longer depends on the URL** — a Selenium session is refused
+    at `https://www.ebay.com/` / `https://www.ebay.de/` itself (the warmup step), so both
+    configured eBay pages return zero items. What it keys on is the *automated browser*, not the
+    IP or the URL: the same searches load fine in a real Chrome on the same public IP. The
+    signals confirmed present in a grid session were ChromeDriver's injected
+    `cdc_adoQpoasnfa76pfcZLmcfl_*` window globals, a SwiftShader WebGL renderer, and (in prod
+    only) a `HeadlessChrome/<ver>` UA, since `getRemoteWebDriver` never sets `--user-agent` while
+    `getLocalWebDriver` does. Measured 2026-11-16: overriding the UA alone does **not** help, and
+    dropping `--headless=new` alone does **not** help, but **patching the `cdc_` string out of the
+    chromedriver binary *and* running headful inside the image's Xvfb together make `ebay.de` work
+    reliably** (60 cards, correct title). `ebay.com` stayed blocked at the homepage that day even
+    with the fix, but **retested 2026-11-19 it works too** (60 cards) — the `.com` block decays,
+    and that day's extra hardness was almost certainly self-inflicted by repeated diagnostic
+    probing, so don't conclude `.com` is permanently lost from a single bad afternoon.
+    Repeated failed/challenged requests from the same
     session in a short window appear to escalate the block (challenge → captcha → flat 403 on
     later requests too) — avoid rapid manual retries against eBay from the same IP while
     debugging. **The warmup navigation must not parse `url` with `java.net.URI`** —
@@ -59,6 +74,20 @@ apps that talk over HTTP:
     Selenium's `driver.get(url)` tolerates but `URI.create()` rejects with
     `IllegalArgumentException`. The homepage origin is now derived with a plain
     `url.replaceFirst("^(https?://[^/]+).*$", "$1")` instead.
+- **Not every "source stopped working" is the same kind of block — check the status code before
+  assuming.** Measured across a 3-day log window on 2026-11-19 (note each failed page burns *two*
+  `Obtaining WebDriver` attempts, because `WebDriverPool` retries once; compare the
+  `Render failed ... retrying once` count, not raw attempts, or you will badly underestimate a
+  failure rate):
+  - **olx** — 403 on the main document, served by CloudFront (`ERROR: The request could not be
+    satisfied`). Was failing ~100% (2433 failed pages / 4874 attempts). Different vendor from
+    eBay's PerimeterX but the *same* fingerprint-based class, and **the same patched-driver +
+    headful fix makes it work** (41 cards vs 0).
+  - **avito** — HTTP 429/439 and a page titled `Доступ ограничен: проблема с IP` ("access
+    restricted: IP problem"). This is an **IP/rate block, not a fingerprint block**: it behaves
+    identically under the patched driver, so the eBay/olx fix does nothing for it. Fixing avito
+    means lowering poll frequency or changing egress IP, not stealth.
+  - **meshok** — HTTP 418 occasionally but ~10% failure overall; basically healthy, leave alone.
 - A parser implements three methods: `getElementCardsList(doc)` (select item cards),
   `getItemFromCard(card)` (extract one `ItemDescription`), `getDomainName()`. Per-item parse
   errors are caught and skipped — a broken card never fails the whole page.
@@ -285,8 +314,24 @@ Three more standalone `docker-compose` deployments, each with its own `-up.sh` a
   `allowUiUpdates: true`) — not the dashboard definition, which is re-synced from the JSON file on
   each start (`updateIntervalSeconds: 30`). Port 3000. Also provisions alerting
   (`grafana/provisioning/alerting/{policies,rules}.yaml`)
-  with rules for scrape-target-down, container-stopped, and container-restarted, notifying via a
-  Telegram contact point. The contact point (`contact-points.yaml`) is generated at deploy time from
+  in two groups: `container-health` (scrape-target-down, container-stopped, container-restarted)
+  and `parser-health` (parser-source-failing, parser-source-no-items), notifying via a
+  Telegram contact point.
+  - The `parser-health` group exists because **a blocked or broken parser does not surface as an
+    error**: `AbstractPageParser.getAllItems` catches everything and returns an empty list, so
+    `/parse` answers `200` with `[]` and the manager logs `0 new items` — identical to a genuinely
+    quiet search. It is driven by two Micrometer counters registered in `AbstractPageParser`:
+    `parser_page_parse_total{domain,outcome}` and `parser_page_items_total{domain}` (item *cards
+    seen on the page*, before dedup — a working search page yields ~60 every poll, so a sustained
+    zero means breakage, not "nothing new"). `parser-source-failing` fires when >50% of a domain's
+    fetches fail over 1h; `parser-source-no-items` fires when a domain is polled for 6h and parses
+    zero cards, which is the case the eBay outage fell into.
+  - Both counters are **pre-registered for every parser in an `@PostConstruct`**, so all series
+    exist from startup at 0. Don't make them lazy: the failing-ratio rule divides by total
+    attempts, and if a domain's `outcome="success"` series only appeared on its first success, a
+    source that is broken from boot would have no series to match and would silently never alert.
+  - The `meterRegistry` field is `@Autowired(required = false)` so parsers constructed outside
+    Spring (the `*PageTest` classes) still work; every counter use is null-guarded. The contact point (`contact-points.yaml`) is generated at deploy time from
   `contact-points.yaml.template` by `grafana-up.sh`, substituting the bot token/chat id from
   `grafana-alerting-params.env` — not committed, since Grafana's own `$__env{}` provisioning macro
   coerces a numeric-looking chat id into a JSON number and fails schema validation. The Telegram

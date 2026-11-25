@@ -134,3 +134,97 @@ groups:
                 - evaluator:
                     type: gt
                     params: [0]
+
+  - orgId: 1
+    name: parser-health
+    folder: Auctions Watcher Alerts
+    interval: 1m
+    rules:
+      # A blocked/broken source does not throw in most cases - page-parser catches the
+      # error and returns an empty list, which the manager reports as "0 new items",
+      # indistinguishable from a quiet search. These two rules catch that silent mode.
+      - uid: parser-source-failing
+        title: Parser source failing
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Alerting
+        labels: {}
+        annotations:
+          summary: "Parser source {{ $labels.domain }} is failing over half of its page fetches in the last hour"
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum by (domain) (increase(parser_page_parse_total{outcome="failure"}[1h])) / sum by (domain) (increase(parser_page_parse_total[1h])) > 0.5
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: math
+              expression: "$A * 0 + 1"
+          - refId: C
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      - uid: parser-source-no-items
+        title: Parser source returning no items
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Alerting
+        labels: {}
+        annotations:
+          summary: "Parser source {{ $labels.domain }} has parsed 0 item cards in 6h despite being polled - likely silently blocked"
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 21600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum by (domain) (increase(parser_page_items_total[6h])) == 0 and sum by (domain) (increase(parser_page_parse_total[6h])) > 0
+              instant: true
+              range: false
+          - refId: B
+            relativeTimeRange:
+              from: 21600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: math
+              expression: "$A * 0 + 1"
+          - refId: C
+            relativeTimeRange:
+              from: 21600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
